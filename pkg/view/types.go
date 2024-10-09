@@ -7,9 +7,10 @@ type BaseEvent struct {
 
 type Session struct {
 	*BaseEvent
-	UserAgent string `json:"user_agent"`
-	Ip        string `json:"ip"`
-	Language  string `json:"language"`
+	UserAgent    string `json:"user_agent,omitempty"`
+	Ip           string `json:"ip,omitempty"`
+	Language     string `json:"language,omitempty"`
+	PragmaHeader string `json:"pragma,omitempty"`
 }
 
 type Event struct {
@@ -45,6 +46,7 @@ type SearchEventData struct {
 	*BaseEvent
 	*Filters
 	Query string `json:"query"`
+	Page  int    `json:"page"`
 }
 
 type PopularityListener interface {
