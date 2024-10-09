@@ -124,10 +124,18 @@ func (m *PersistentMemoryTrackingHandler) GetQueries() map[string]uint {
 	return m.Queries
 }
 
-func (m *PersistentMemoryTrackingHandler) GetSessions() map[string]*SessionData {
+func (m *PersistentMemoryTrackingHandler) GetSessions() []*SessionData {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.Sessions
+	sessions := make([]*SessionData, len(m.Sessions))
+	i := 0
+	for _, session := range m.Sessions {
+		if len(session.Events) > 1 {
+			sessions[i] = session
+			i++
+		}
+	}
+	return sessions[:i]
 }
 
 func (m *PersistentMemoryTrackingHandler) HandleSessionEvent(event Session) {
