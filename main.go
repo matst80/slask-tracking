@@ -29,11 +29,11 @@ func run_application() int {
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-	mux.HandleFunc("/save", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/tracking/save", func(w http.ResponseWriter, r *http.Request) {
 		viewHandler.Save()
 		w.WriteHeader(http.StatusAccepted)
 	})
-	mux.HandleFunc("/popularity", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/tracking/popularity", func(w http.ResponseWriter, r *http.Request) {
 		result := viewHandler.GetItemPopularity()
 		w.Header().Set("Content-Type", "application/json")
 		err := json.NewEncoder(w).Encode(result)
@@ -41,7 +41,7 @@ func run_application() int {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	})
-	mux.HandleFunc("/queries", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/tracking/queries", func(w http.ResponseWriter, r *http.Request) {
 		result := viewHandler.GetQueries()
 		w.Header().Set("Content-Type", "application/json")
 		err := json.NewEncoder(w).Encode(result)
@@ -49,7 +49,7 @@ func run_application() int {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	})
-	mux.HandleFunc("/sessions", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/tracking/sessions", func(w http.ResponseWriter, r *http.Request) {
 		result := viewHandler.GetSessions()
 		w.Header().Set("Content-Type", "application/json")
 		err := json.NewEncoder(w).Encode(result)

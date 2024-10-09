@@ -22,7 +22,7 @@ type PersistentMemoryTrackingHandler struct {
 	trackingHandler PopularityListener
 	ItemPopularity  SortOverride           `json:"item_popularity"`
 	Queries         map[string]uint        `json:"queries"`
-	Sessions        map[uint32]SessionData `json:"sessions"`
+	Sessions        map[string]SessionData `json:"sessions"`
 	FieldPopularity SortOverride           `json:"field_popularity"`
 }
 
@@ -41,7 +41,7 @@ func MakeMemoryTrackingHandler(path string) *PersistentMemoryTrackingHandler {
 		instance = &PersistentMemoryTrackingHandler{
 			ItemPopularity:  make(SortOverride),
 			Queries:         make(map[string]uint),
-			Sessions:        make(map[uint32]SessionData),
+			Sessions:        make(map[string]SessionData),
 			FieldPopularity: make(SortOverride),
 		}
 	}
@@ -61,7 +61,7 @@ func MakeMemoryTrackingHandler(path string) *PersistentMemoryTrackingHandler {
 		instance.Queries = make(map[string]uint)
 	}
 	if instance.Sessions == nil {
-		instance.Sessions = make(map[uint32]SessionData)
+		instance.Sessions = make(map[string]SessionData)
 	}
 	if instance.FieldPopularity == nil {
 		instance.FieldPopularity = make(SortOverride)
@@ -121,7 +121,7 @@ func (m *PersistentMemoryTrackingHandler) GetQueries() map[string]uint {
 	return m.Queries
 }
 
-func (m *PersistentMemoryTrackingHandler) GetSessions() map[uint32]SessionData {
+func (m *PersistentMemoryTrackingHandler) GetSessions() map[string]SessionData {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.Sessions
@@ -132,7 +132,8 @@ func (m *PersistentMemoryTrackingHandler) HandleSessionEvent(event Session) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.changes++
-	m.Sessions[event.SessionId] = SessionData{
+	idString := string(event.SessionId)
+	m.Sessions[idString] = SessionData{
 		Session: &event,
 		Events:  make([]BaseEvent, 0),
 	}
@@ -143,7 +144,8 @@ func (m *PersistentMemoryTrackingHandler) HandleEvent(event Event) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.ItemPopularity[event.Item] += 1
-	session, ok := m.Sessions[event.SessionId]
+	idString := string(event.SessionId)
+	session, ok := m.Sessions[idString]
 	m.changes++
 	if ok {
 		session.Events = append(session.Events, *event.BaseEvent)
@@ -155,7 +157,8 @@ func (m *PersistentMemoryTrackingHandler) HandleCartEvent(event CartEvent) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.ItemPopularity[event.Item] += 10
-	session, ok := m.Sessions[event.SessionId]
+	idString := string(event.SessionId)
+	session, ok := m.Sessions[idString]
 	m.changes++
 	if ok {
 		session.Events = append(session.Events, *event.BaseEvent)
@@ -178,7 +181,8 @@ func (m *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventDat
 	for _, filter := range event.Filters.NumberFilter {
 		m.FieldPopularity[filter.Id] += 1
 	}
-	session, ok := m.Sessions[event.SessionId]
+	idString := string(event.SessionId)
+	session, ok := m.Sessions[idString]
 	if ok {
 		session.Events = append(session.Events, *event.BaseEvent)
 	}
