@@ -2,6 +2,7 @@ package view
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"sync"
@@ -144,7 +145,7 @@ func (m *PersistentMemoryTrackingHandler) HandleEvent(event Event) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.ItemPopularity[event.Item] += 1
-	idString := string(event.SessionId)
+	idString := fmt.Sprintf("%d", event.SessionId)
 	session, ok := m.Sessions[idString]
 	m.changes++
 	if ok {
@@ -157,7 +158,7 @@ func (m *PersistentMemoryTrackingHandler) HandleCartEvent(event CartEvent) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.ItemPopularity[event.Item] += 10
-	idString := string(event.SessionId)
+	idString := fmt.Sprintf("%d", event.SessionId)
 	session, ok := m.Sessions[idString]
 	m.changes++
 	if ok {
@@ -181,7 +182,7 @@ func (m *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventDat
 	for _, filter := range event.Filters.NumberFilter {
 		m.FieldPopularity[filter.Id] += 1
 	}
-	idString := string(event.SessionId)
+	idString := fmt.Sprintf("%d", event.SessionId)
 	session, ok := m.Sessions[idString]
 	if ok {
 		session.Events = append(session.Events, *event.BaseEvent)
