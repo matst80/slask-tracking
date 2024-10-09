@@ -1,6 +1,7 @@
 package view
 
 type BaseEvent struct {
+	TimeStamp int64  `json:"ts"`
 	SessionId uint32 `json:"session_id"`
 	Event     uint16 `json:"event"`
 }

@@ -77,6 +77,9 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 			case 0:
 				var session view.Session
 				if err := json.Unmarshal(d.Body, &session); err == nil {
+					if session.TimeStamp == 0 {
+						session.TimeStamp = d.Timestamp.Unix()
+					}
 					t.handler.HandleSessionEvent(session)
 				} else {
 					log.Printf("Failed to unmarshal session message %v", err)
@@ -84,6 +87,9 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 			case 1:
 				var searchEventData view.SearchEventData
 				if err := json.Unmarshal(d.Body, &searchEventData); err == nil {
+					if searchEventData.TimeStamp == 0 {
+						searchEventData.TimeStamp = d.Timestamp.Unix()
+					}
 					t.handler.HandleSearchEvent(searchEventData)
 				} else {
 					log.Printf("Failed to unmarshal search event message %v", err)
@@ -98,6 +104,9 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 			case 3:
 				var cartEvent view.CartEvent
 				if err := json.Unmarshal(d.Body, &cartEvent); err == nil {
+					if cartEvent.TimeStamp == 0 {
+						cartEvent.TimeStamp = d.Timestamp.Unix()
+					}
 					t.handler.HandleCartEvent(cartEvent)
 				} else {
 					log.Printf("Failed to unmarshal cart event message %v", err)
@@ -105,6 +114,9 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 			case 4:
 				var cartEvent view.CartEvent
 				if err := json.Unmarshal(d.Body, &cartEvent); err == nil {
+					if cartEvent.TimeStamp == 0 {
+						cartEvent.TimeStamp = d.Timestamp.Unix()
+					}
 					t.handler.HandleCartEvent(cartEvent)
 				} else {
 					log.Printf("Failed to unmarshal cart event message %v", err)
@@ -112,6 +124,9 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 			case 5:
 				var impressionsEvent view.ImpressionEvent
 				if err := json.Unmarshal(d.Body, &impressionsEvent); err == nil {
+					if impressionsEvent.TimeStamp == 0 {
+						impressionsEvent.TimeStamp = d.Timestamp.Unix()
+					}
 					t.handler.HandleImpressionEvent(impressionsEvent)
 				} else {
 					log.Printf("Failed to unmarshal impressions event message %v", err)
