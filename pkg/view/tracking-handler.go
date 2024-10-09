@@ -14,6 +14,7 @@ type TrackingHandler interface {
 	HandleEvent(event Event)
 	HandleSearchEvent(event SearchEventData)
 	HandleCartEvent(event CartEvent)
+	HandleImpressionEvent(event ImpressionEvent)
 }
 
 type PersistentMemoryTrackingHandler struct {
@@ -182,6 +183,20 @@ func (m *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventDat
 	for _, filter := range event.Filters.NumberFilter {
 		m.FieldPopularity[filter.Id] += 1
 	}
+	idString := fmt.Sprintf("%d", event.SessionId)
+	session, ok := m.Sessions[idString]
+	if ok {
+		session.Events = append(session.Events, *event.BaseEvent)
+	}
+}
+
+func (m *PersistentMemoryTrackingHandler) HandleImpressionEvent(event ImpressionEvent) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, impression := range event.Items {
+		m.ItemPopularity[impression.Id] += 0.01 + float64(impression.Position)/1000
+	}
+	m.changes++
 	idString := fmt.Sprintf("%d", event.SessionId)
 	session, ok := m.Sessions[idString]
 	if ok {

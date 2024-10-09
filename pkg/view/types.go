@@ -50,3 +50,13 @@ type SearchEventData struct {
 type PopularityListener interface {
 	PopularityChanged(sort *SortOverride) error
 }
+
+type Impression struct {
+	Id       uint    `json:"id"`
+	Position float32 `json:"position"`
+}
+
+type ImpressionEvent struct {
+	*BaseEvent
+	Items []Impression `json:"items"`
+}

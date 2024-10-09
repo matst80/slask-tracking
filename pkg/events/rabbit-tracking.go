@@ -109,7 +109,13 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 				} else {
 					log.Printf("Failed to unmarshal cart event message %v", err)
 				}
-
+			case 5:
+				var impressionsEvent view.ImpressionEvent
+				if err := json.Unmarshal(d.Body, &impressionsEvent); err == nil {
+					t.handler.HandleImpressionEvent(impressionsEvent)
+				} else {
+					log.Printf("Failed to unmarshal impressions event message %v", err)
+				}
 			default:
 				log.Printf("Unknown event type %v", event.Event)
 
