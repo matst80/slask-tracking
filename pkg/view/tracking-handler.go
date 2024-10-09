@@ -129,7 +129,7 @@ func (m *PersistentMemoryTrackingHandler) GetSessions() map[string]SessionData {
 }
 
 func (m *PersistentMemoryTrackingHandler) HandleSessionEvent(event Session) {
-	log.Printf("Session new session event %d", event.SessionId)
+	// log.Printf("Session new session event %d", event.SessionId)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.changes++
@@ -141,7 +141,7 @@ func (m *PersistentMemoryTrackingHandler) HandleSessionEvent(event Session) {
 }
 
 func (m *PersistentMemoryTrackingHandler) HandleEvent(event Event) {
-	log.Printf("Event SessionId: %d, ItemId: %d, Position: %f", event.SessionId, event.Item, event.Position)
+	// log.Printf("Event SessionId: %d, ItemId: %d, Position: %f", event.SessionId, event.Item, event.Position)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.ItemPopularity[event.Item] += 1
@@ -154,7 +154,7 @@ func (m *PersistentMemoryTrackingHandler) HandleEvent(event Event) {
 }
 
 func (m *PersistentMemoryTrackingHandler) HandleCartEvent(event CartEvent) {
-	log.Printf("Cart event SessionId: %d, ItemId: %d, Quantity: %d", event.SessionId, event.Item, event.Quantity)
+	// log.Printf("Cart event SessionId: %d, ItemId: %d, Quantity: %d", event.SessionId, event.Item, event.Quantity)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.ItemPopularity[event.Item] += 10
