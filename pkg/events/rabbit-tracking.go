@@ -3,6 +3,7 @@ package events
 import (
 	"encoding/json"
 	"log"
+	"time"
 
 	"github.com/matst80/slask-tracking/pkg/view"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -78,7 +79,7 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 				var session view.Session
 				if err := json.Unmarshal(d.Body, &session); err == nil {
 					if session.TimeStamp == 0 {
-						session.TimeStamp = d.Timestamp.Unix()
+						session.TimeStamp = time.Now().Unix()
 					}
 					t.handler.HandleSessionEvent(session)
 				} else {
@@ -88,7 +89,7 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 				var searchEventData view.SearchEventData
 				if err := json.Unmarshal(d.Body, &searchEventData); err == nil {
 					if searchEventData.TimeStamp == 0 {
-						searchEventData.TimeStamp = d.Timestamp.Unix()
+						searchEventData.TimeStamp = time.Now().Unix()
 					}
 					t.handler.HandleSearchEvent(searchEventData)
 				} else {
@@ -105,7 +106,7 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 				var cartEvent view.CartEvent
 				if err := json.Unmarshal(d.Body, &cartEvent); err == nil {
 					if cartEvent.TimeStamp == 0 {
-						cartEvent.TimeStamp = d.Timestamp.Unix()
+						cartEvent.TimeStamp = time.Now().Unix()
 					}
 					t.handler.HandleCartEvent(cartEvent)
 				} else {
@@ -115,7 +116,7 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 				var cartEvent view.CartEvent
 				if err := json.Unmarshal(d.Body, &cartEvent); err == nil {
 					if cartEvent.TimeStamp == 0 {
-						cartEvent.TimeStamp = d.Timestamp.Unix()
+						cartEvent.TimeStamp = time.Now().Unix()
 					}
 					t.handler.HandleCartEvent(cartEvent)
 				} else {
@@ -125,7 +126,7 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 				var impressionsEvent view.ImpressionEvent
 				if err := json.Unmarshal(d.Body, &impressionsEvent); err == nil {
 					if impressionsEvent.TimeStamp == 0 {
-						impressionsEvent.TimeStamp = d.Timestamp.Unix()
+						impressionsEvent.TimeStamp = time.Now().Unix()
 					}
 					t.handler.HandleImpressionEvent(impressionsEvent)
 				} else {
@@ -135,7 +136,7 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 				var actionEvent view.ActionEvent
 				if err := json.Unmarshal(d.Body, &actionEvent); err == nil {
 					if actionEvent.TimeStamp == 0 {
-						actionEvent.TimeStamp = d.Timestamp.Unix()
+						actionEvent.TimeStamp = time.Now().Unix()
 					}
 					t.handler.HandleActionEvent(actionEvent)
 				} else {
