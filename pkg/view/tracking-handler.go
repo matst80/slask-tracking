@@ -22,15 +22,15 @@ type PersistentMemoryTrackingHandler struct {
 	mu              sync.Mutex
 	changes         uint
 	trackingHandler PopularityListener
-	ItemPopularity  SortOverride           `json:"item_popularity"`
-	Queries         map[string]uint        `json:"queries"`
-	Sessions        map[string]SessionData `json:"sessions"`
-	FieldPopularity SortOverride           `json:"field_popularity"`
+	ItemPopularity  SortOverride            `json:"item_popularity"`
+	Queries         map[string]uint         `json:"queries"`
+	Sessions        map[string]*SessionData `json:"sessions"`
+	FieldPopularity SortOverride            `json:"field_popularity"`
 }
 
 type SessionData struct {
 	*Session
-	Events []BaseEvent `json:"events"`
+	Events []interface{} `json:"events"`
 }
 
 func (m *PersistentMemoryTrackingHandler) ConnectPopularityListener(handler PopularityListener) {
@@ -43,7 +43,7 @@ func MakeMemoryTrackingHandler(path string) *PersistentMemoryTrackingHandler {
 		instance = &PersistentMemoryTrackingHandler{
 			ItemPopularity:  make(SortOverride),
 			Queries:         make(map[string]uint),
-			Sessions:        make(map[string]SessionData),
+			Sessions:        make(map[string]*SessionData),
 			FieldPopularity: make(SortOverride),
 		}
 	}
@@ -63,7 +63,7 @@ func MakeMemoryTrackingHandler(path string) *PersistentMemoryTrackingHandler {
 		instance.Queries = make(map[string]uint)
 	}
 	if instance.Sessions == nil {
-		instance.Sessions = make(map[string]SessionData)
+		instance.Sessions = make(map[string]*SessionData)
 	}
 	if instance.FieldPopularity == nil {
 		instance.FieldPopularity = make(SortOverride)
@@ -123,7 +123,7 @@ func (m *PersistentMemoryTrackingHandler) GetQueries() map[string]uint {
 	return m.Queries
 }
 
-func (m *PersistentMemoryTrackingHandler) GetSessions() map[string]SessionData {
+func (m *PersistentMemoryTrackingHandler) GetSessions() map[string]*SessionData {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.Sessions
@@ -134,10 +134,11 @@ func (m *PersistentMemoryTrackingHandler) HandleSessionEvent(event Session) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.changes++
-	idString := string(event.SessionId)
-	m.Sessions[idString] = SessionData{
+	idString := fmt.Sprintf("%d", event.SessionId)
+	events := make([]interface{}, 0)
+	m.Sessions[idString] = &SessionData{
 		Session: &event,
-		Events:  make([]BaseEvent, 0),
+		Events:  events,
 	}
 }
 
@@ -150,7 +151,7 @@ func (m *PersistentMemoryTrackingHandler) HandleEvent(event Event) {
 	session, ok := m.Sessions[idString]
 	m.changes++
 	if ok {
-		session.Events = append(session.Events, *event.BaseEvent)
+		session.Events = append(session.Events, event)
 	}
 }
 
@@ -163,7 +164,7 @@ func (m *PersistentMemoryTrackingHandler) HandleCartEvent(event CartEvent) {
 	session, ok := m.Sessions[idString]
 	m.changes++
 	if ok {
-		session.Events = append(session.Events, *event.BaseEvent)
+		session.Events = append(session.Events, event)
 	}
 }
 
@@ -186,7 +187,7 @@ func (m *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventDat
 	idString := fmt.Sprintf("%d", event.SessionId)
 	session, ok := m.Sessions[idString]
 	if ok {
-		session.Events = append(session.Events, *event.BaseEvent)
+		session.Events = append(session.Events, event)
 	}
 }
 
@@ -200,6 +201,6 @@ func (m *PersistentMemoryTrackingHandler) HandleImpressionEvent(event Impression
 	idString := fmt.Sprintf("%d", event.SessionId)
 	session, ok := m.Sessions[idString]
 	if ok {
-		session.Events = append(session.Events, *event.BaseEvent)
+		session.Events = append(session.Events, event)
 	}
 }
