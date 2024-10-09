@@ -63,3 +63,9 @@ type ImpressionEvent struct {
 	*BaseEvent
 	Items []Impression `json:"items"`
 }
+
+type ActionEvent struct {
+	*BaseEvent
+	Action string `json:"action"`
+	Reason string `json:"reason"`
+}

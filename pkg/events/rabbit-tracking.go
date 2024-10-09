@@ -131,6 +131,16 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 				} else {
 					log.Printf("Failed to unmarshal impressions event message %v", err)
 				}
+			case 6:
+				var actionEvent view.ActionEvent
+				if err := json.Unmarshal(d.Body, &actionEvent); err == nil {
+					if actionEvent.TimeStamp == 0 {
+						actionEvent.TimeStamp = d.Timestamp.Unix()
+					}
+					t.handler.HandleActionEvent(actionEvent)
+				} else {
+					log.Printf("Failed to unmarshal impressions event message %v", err)
+				}
 			default:
 				log.Printf("Unknown event type %v", event.Event)
 
