@@ -138,6 +138,12 @@ func (m *PersistentMemoryTrackingHandler) GetSessions() []*SessionData {
 	return sessions[:i]
 }
 
+func (m *PersistentMemoryTrackingHandler) GetFieldPopularity() SortOverride {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.FieldPopularity
+}
+
 func (m *PersistentMemoryTrackingHandler) HandleSessionEvent(event Session) {
 	// log.Printf("Session new session event %d", event.SessionId)
 	m.mu.Lock()
