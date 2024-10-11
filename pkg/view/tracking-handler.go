@@ -19,7 +19,7 @@ type TrackingHandler interface {
 }
 
 type UpdateHandler interface {
-	HandleUpdate(update interface{})
+	HandleUpdate(update []interface{})
 }
 
 type PersistentMemoryTrackingHandler struct {
@@ -155,14 +155,15 @@ func (m *PersistentMemoryTrackingHandler) GetSessions() []*SessionData {
 	return sessions[:i]
 }
 
-func (m *PersistentMemoryTrackingHandler) HandleUpdate(item interface{}) {
+func (m *PersistentMemoryTrackingHandler) HandleUpdate(item []interface{}) {
 	// log.Printf("Session new session event %d", event.SessionId)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.changes++
-	m.UpdatedItems = append(m.UpdatedItems, item)
-	if len(m.UpdatedItems) > int(m.updatesToKeep) {
-		m.UpdatedItems = m.UpdatedItems[1:]
+	m.UpdatedItems = append(m.UpdatedItems, item...)
+	diff := len(m.UpdatedItems) - m.updatesToKeep
+	if diff > 0 {
+		m.UpdatedItems = m.UpdatedItems[len(m.UpdatedItems)-diff:]
 	}
 }
 
