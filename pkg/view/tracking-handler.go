@@ -18,15 +18,21 @@ type TrackingHandler interface {
 	HandleActionEvent(event ActionEvent)
 }
 
+type UpdateHandler interface {
+	HandleUpdate(update interface{})
+}
+
 type PersistentMemoryTrackingHandler struct {
 	path            string
 	mu              sync.Mutex
 	changes         uint
+	updatesToKeep   int
 	trackingHandler PopularityListener
 	ItemPopularity  SortOverride            `json:"item_popularity"`
 	Queries         map[string]uint         `json:"queries"`
 	Sessions        map[string]*SessionData `json:"sessions"`
 	FieldPopularity SortOverride            `json:"field_popularity"`
+	UpdatedItems    []interface{}           `json:"updated_items"`
 }
 
 type SessionData struct {
@@ -38,7 +44,7 @@ func (m *PersistentMemoryTrackingHandler) ConnectPopularityListener(handler Popu
 	m.trackingHandler = handler
 }
 
-func MakeMemoryTrackingHandler(path string) *PersistentMemoryTrackingHandler {
+func MakeMemoryTrackingHandler(path string, itemsToKeep int) *PersistentMemoryTrackingHandler {
 	instance, err := load(path)
 	if err != nil {
 		instance = &PersistentMemoryTrackingHandler{
@@ -55,8 +61,10 @@ func MakeMemoryTrackingHandler(path string) *PersistentMemoryTrackingHandler {
 			}
 		}
 	}()
+
 	instance.path = path
 	instance.changes = 0
+	instance.updatesToKeep = itemsToKeep
 	if instance.ItemPopularity == nil {
 		instance.ItemPopularity = make(SortOverride)
 	}
@@ -68,6 +76,9 @@ func MakeMemoryTrackingHandler(path string) *PersistentMemoryTrackingHandler {
 	}
 	if instance.FieldPopularity == nil {
 		instance.FieldPopularity = make(SortOverride)
+	}
+	if instance.UpdatedItems == nil {
+		instance.UpdatedItems = make([]interface{}, 0)
 	}
 	return instance
 }
@@ -118,6 +129,12 @@ func (m *PersistentMemoryTrackingHandler) GetItemPopularity() map[uint]float64 {
 	return m.ItemPopularity
 }
 
+func (m *PersistentMemoryTrackingHandler) GetUpdatedItems() []interface{} {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.UpdatedItems
+}
+
 func (m *PersistentMemoryTrackingHandler) GetQueries() map[string]uint {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -136,6 +153,17 @@ func (m *PersistentMemoryTrackingHandler) GetSessions() []*SessionData {
 		}
 	}
 	return sessions[:i]
+}
+
+func (m *PersistentMemoryTrackingHandler) HandleUpdate(item interface{}) {
+	// log.Printf("Session new session event %d", event.SessionId)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.changes++
+	m.UpdatedItems = append(m.UpdatedItems, item)
+	if len(m.UpdatedItems) > int(m.updatesToKeep) {
+		m.UpdatedItems = m.UpdatedItems[1:]
+	}
 }
 
 func (m *PersistentMemoryTrackingHandler) HandleSessionEvent(event Session) {
