@@ -25,6 +25,7 @@ func run_application() int {
 	popularityHandler := view.NewSortOverrideStorage(redisUrl, redisPassword, 0)
 	defer viewHandler.Save()
 	go client.Connect(viewHandler)
+	go client.ConnectUpdates(viewHandler)
 	viewHandler.ConnectPopularityListener(popularityHandler)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -42,6 +43,15 @@ func run_application() int {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	})
+	mux.HandleFunc("/tracking/field-popularity", func(w http.ResponseWriter, r *http.Request) {
+		result := viewHandler.GetFieldPopularity()
+		w.Header().Set("Content-Type", "application/json")
+		err := json.NewEncoder(w).Encode(result)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+
 	mux.HandleFunc("/tracking/queries", func(w http.ResponseWriter, r *http.Request) {
 		result := viewHandler.GetQueries()
 		w.Header().Set("Content-Type", "application/json")
