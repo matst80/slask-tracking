@@ -7,6 +7,8 @@ import (
 
 	"github.com/matst80/slask-tracking/pkg/events"
 	"github.com/matst80/slask-tracking/pkg/view"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var rabbitUrl = os.Getenv("RABBIT_URL")
@@ -76,6 +78,7 @@ func run_application() int {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	})
+	mux.Handle("/metrics", promhttp.Handler())
 	err := http.ListenAndServe(":8080", mux)
 	if err != nil {
 		return 1
