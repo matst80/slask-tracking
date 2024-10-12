@@ -114,19 +114,23 @@ func (s *PersistentMemoryTrackingHandler) save() error {
 	}
 	if len(s.Sessions) > 5000 {
 		log.Println("Clearing sessions")
+		tm := time.Now()
+		limit := tm.Unix() - 60*60*24*3
 		for key, item := range s.Sessions {
-			if len(item.Events) < 5 {
+
+			if len(item.Events) < 5 || limit > item.TimeStamp {
 				delete(s.Sessions, key)
 			}
 		}
 		runtime.GC()
 	}
 	log.Println("Saving tracking data")
+
+	s.changes = 0
+	err := s.writeFile(s.path)
 	if s.trackingHandler != nil {
 		go s.trackingHandler.PopularityChanged(&s.ItemPopularity)
 	}
-	s.changes = 0
-	err := s.writeFile(s.path)
 	return err
 }
 
