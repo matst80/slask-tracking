@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime"
 	"sync"
 	"time"
 
@@ -110,6 +111,15 @@ func (s *PersistentMemoryTrackingHandler) save() error {
 	defer s.mu.Unlock()
 	if s.changes == 0 {
 		return nil
+	}
+	if len(s.Sessions) > 5000 {
+		log.Println("Clearing sessions")
+		for key, item := range s.Sessions {
+			if len(item.Events) < 5 {
+				delete(s.Sessions, key)
+			}
+		}
+		runtime.GC()
 	}
 	log.Println("Saving tracking data")
 	if s.trackingHandler != nil {
