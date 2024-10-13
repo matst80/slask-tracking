@@ -1,6 +1,6 @@
 module github.com/matst80/slask-tracking
 
-go 1.22.4
+go 1.23.0
 
 require (
 	github.com/rabbitmq/amqp091-go v1.10.0
