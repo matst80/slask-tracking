@@ -69,3 +69,22 @@ type ActionEvent struct {
 	Action string `json:"action"`
 	Reason string `json:"reason"`
 }
+
+type PriceUpdateItem struct {
+	Url             string  `json:"url"`
+	Id              uint    `json:"id"`
+	Disclaimer      string  `json:"disclaimer,omitempty"`
+	ReleaseDate     string  `json:"releaseDate,omitempty"`
+	SaleStatus      string  `json:"saleStatus"`
+	MarginPercent   float64 `json:"mp,omitempty"`
+	PresaleDate     string  `json:"presaleDate,omitempty"`
+	Restock         string  `json:"restock,omitempty"`
+	AdvertisingText string  `json:"advertisingText,omitempty"`
+	Img             string  `json:"img,omitempty"`
+	BadgeUrl        string  `json:"badgeUrl,omitempty"`
+	BulletPoints    string  `json:"bp,omitempty"`
+	LastUpdate      int64   `json:"lastUpdate,omitempty"`
+	Created         int64   `json:"created,omitempty"`
+	Buyable         bool    `json:"buyable"`
+	BuyableInStore  bool    `json:"buyableInStore"`
+}

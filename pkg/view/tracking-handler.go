@@ -5,8 +5,12 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime"
 	"sync"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 type TrackingHandler interface {
@@ -18,15 +22,25 @@ type TrackingHandler interface {
 	HandleActionEvent(event ActionEvent)
 }
 
+type UpdateHandler interface {
+	HandleUpdate(update []interface{})
+}
+
+type PriceUpdateHandler interface {
+	HandlePriceUpdate(update []PriceUpdateItem)
+}
+
 type PersistentMemoryTrackingHandler struct {
 	path            string
 	mu              sync.Mutex
 	changes         uint
+	updatesToKeep   int
 	trackingHandler PopularityListener
 	ItemPopularity  SortOverride            `json:"item_popularity"`
 	Queries         map[string]uint         `json:"queries"`
 	Sessions        map[string]*SessionData `json:"sessions"`
 	FieldPopularity SortOverride            `json:"field_popularity"`
+	UpdatedItems    []interface{}           `json:"updated_items"`
 }
 
 type SessionData struct {
@@ -34,11 +48,26 @@ type SessionData struct {
 	Events []interface{} `json:"events"`
 }
 
+var (
+	opsProcessed = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "slasktracking_processed_tracking_events_total",
+		Help: "The total number of processed tracking events",
+	})
+	updatedProcessed = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "slasktracking_processed_update_events_total",
+		Help: "The total number of processed update events",
+	})
+	updatedItemsProcessed = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "slasktracking_processed_item_updates_total",
+		Help: "The total number of processed items updates",
+	})
+)
+
 func (m *PersistentMemoryTrackingHandler) ConnectPopularityListener(handler PopularityListener) {
 	m.trackingHandler = handler
 }
 
-func MakeMemoryTrackingHandler(path string) *PersistentMemoryTrackingHandler {
+func MakeMemoryTrackingHandler(path string, itemsToKeep int) *PersistentMemoryTrackingHandler {
 	instance, err := load(path)
 	if err != nil {
 		instance = &PersistentMemoryTrackingHandler{
@@ -55,8 +84,10 @@ func MakeMemoryTrackingHandler(path string) *PersistentMemoryTrackingHandler {
 			}
 		}
 	}()
+
 	instance.path = path
 	instance.changes = 0
+	instance.updatesToKeep = itemsToKeep
 	if instance.ItemPopularity == nil {
 		instance.ItemPopularity = make(SortOverride)
 	}
@@ -68,6 +99,9 @@ func MakeMemoryTrackingHandler(path string) *PersistentMemoryTrackingHandler {
 	}
 	if instance.FieldPopularity == nil {
 		instance.FieldPopularity = make(SortOverride)
+	}
+	if instance.UpdatedItems == nil {
+		instance.UpdatedItems = make([]interface{}, 0)
 	}
 	return instance
 }
@@ -82,12 +116,25 @@ func (s *PersistentMemoryTrackingHandler) save() error {
 	if s.changes == 0 {
 		return nil
 	}
+	if len(s.Sessions) > 5000 {
+		log.Println("Clearing sessions")
+		tm := time.Now()
+		limit := tm.Unix() - 60*60*24*3
+		for key, item := range s.Sessions {
+
+			if len(item.Events) < 5 || limit > item.TimeStamp {
+				delete(s.Sessions, key)
+			}
+		}
+		runtime.GC()
+	}
 	log.Println("Saving tracking data")
+
+	s.changes = 0
+	err := s.writeFile(s.path)
 	if s.trackingHandler != nil {
 		go s.trackingHandler.PopularityChanged(&s.ItemPopularity)
 	}
-	s.changes = 0
-	err := s.writeFile(s.path)
 	return err
 }
 
@@ -118,6 +165,12 @@ func (m *PersistentMemoryTrackingHandler) GetItemPopularity() map[uint]float64 {
 	return m.ItemPopularity
 }
 
+func (m *PersistentMemoryTrackingHandler) GetUpdatedItems() []interface{} {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.UpdatedItems
+}
+
 func (m *PersistentMemoryTrackingHandler) GetQueries() map[string]uint {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -138,6 +191,27 @@ func (m *PersistentMemoryTrackingHandler) GetSessions() []*SessionData {
 	return sessions[:i]
 }
 
+func (m *PersistentMemoryTrackingHandler) HandleUpdate(item []interface{}) {
+	// log.Printf("Session new session event %d", event.SessionId)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.changes++
+	updatedProcessed.Inc()
+	m.UpdatedItems = append(m.UpdatedItems, item...)
+	updatedItemsProcessed.Add(float64(len(item)))
+	diff := len(m.UpdatedItems) - m.updatesToKeep
+	if diff > 0 {
+		m.UpdatedItems = m.UpdatedItems[len(m.UpdatedItems)-diff:]
+	}
+}
+
+func (m *PersistentMemoryTrackingHandler) HandlePriceUpdate(item []PriceUpdateItem) {
+	for _, item := range item {
+		log.Printf("Price update %d, url: %s", item.Id, "https://www.elgiganten.se"+item.Url)
+
+	}
+}
+
 func (m *PersistentMemoryTrackingHandler) GetFieldPopularity() SortOverride {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -149,6 +223,7 @@ func (m *PersistentMemoryTrackingHandler) HandleSessionEvent(event Session) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.changes++
+	opsProcessed.Inc()
 	idString := fmt.Sprintf("%d", event.SessionId)
 	events := make([]interface{}, 0)
 	m.Sessions[idString] = &SessionData{
@@ -165,6 +240,7 @@ func (m *PersistentMemoryTrackingHandler) HandleEvent(event Event) {
 	idString := fmt.Sprintf("%d", event.SessionId)
 	session, ok := m.Sessions[idString]
 	m.changes++
+	opsProcessed.Inc()
 	if ok {
 		session.Events = append(session.Events, event)
 	}
@@ -178,6 +254,7 @@ func (m *PersistentMemoryTrackingHandler) HandleCartEvent(event CartEvent) {
 	idString := fmt.Sprintf("%d", event.SessionId)
 	session, ok := m.Sessions[idString]
 	m.changes++
+	opsProcessed.Inc()
 	if ok {
 		session.Events = append(session.Events, event)
 	}
@@ -187,6 +264,7 @@ func (m *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventDat
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.changes++
+	opsProcessed.Inc()
 	if event.Query != "" {
 		m.Queries[event.Query] += 1
 	}
@@ -209,8 +287,10 @@ func (m *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventDat
 func (m *PersistentMemoryTrackingHandler) HandleImpressionEvent(event ImpressionEvent) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	opsProcessed.Inc()
 	for _, impression := range event.Items {
 		m.ItemPopularity[impression.Id] += 0.01 + float64(impression.Position)/1000
+
 	}
 	m.changes++
 	idString := fmt.Sprintf("%d", event.SessionId)

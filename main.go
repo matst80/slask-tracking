@@ -7,6 +7,8 @@ import (
 
 	"github.com/matst80/slask-tracking/pkg/events"
 	"github.com/matst80/slask-tracking/pkg/view"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var rabbitUrl = os.Getenv("RABBIT_URL")
@@ -16,14 +18,17 @@ var redisPassword = os.Getenv("REDIS_PASSWORD")
 func run_application() int {
 	client := events.RabbitTransportClient{
 		RabbitTrackingConfig: events.RabbitTrackingConfig{
-			TrackingTopic: "tracking",
-			Url:           rabbitUrl,
+			TrackingTopic:      "tracking",
+			ItemsUpsertedTopic: "item_added",
+			Url:                rabbitUrl,
 		},
 	}
-	viewHandler := view.MakeMemoryTrackingHandler("data/tracking.json")
+	viewHandler := view.MakeMemoryTrackingHandler("data/tracking.json", 500)
 	popularityHandler := view.NewSortOverrideStorage(redisUrl, redisPassword, 0)
 	defer viewHandler.Save()
 	go client.Connect(viewHandler)
+	go client.ConnectUpdates(viewHandler)
+	go client.ConnectPriceUpdates(viewHandler)
 	viewHandler.ConnectPopularityListener(popularityHandler)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -58,6 +63,14 @@ func run_application() int {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	})
+	mux.HandleFunc("/tracking/updated", func(w http.ResponseWriter, r *http.Request) {
+		result := viewHandler.GetUpdatedItems()
+		w.Header().Set("Content-Type", "application/json")
+		err := json.NewEncoder(w).Encode(result)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
 	mux.HandleFunc("/tracking/sessions", func(w http.ResponseWriter, r *http.Request) {
 		result := viewHandler.GetSessions()
 		w.Header().Set("Content-Type", "application/json")
@@ -66,6 +79,7 @@ func run_application() int {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	})
+	mux.Handle("/metrics", promhttp.Handler())
 	err := http.ListenAndServe(":8080", mux)
 	if err != nil {
 		return 1
