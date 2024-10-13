@@ -26,6 +26,10 @@ type UpdateHandler interface {
 	HandleUpdate(update []interface{})
 }
 
+type PriceUpdateHandler interface {
+	HandlePriceUpdate(update []PriceUpdateItem)
+}
+
 type PersistentMemoryTrackingHandler struct {
 	path            string
 	mu              sync.Mutex
@@ -198,6 +202,13 @@ func (m *PersistentMemoryTrackingHandler) HandleUpdate(item []interface{}) {
 	diff := len(m.UpdatedItems) - m.updatesToKeep
 	if diff > 0 {
 		m.UpdatedItems = m.UpdatedItems[len(m.UpdatedItems)-diff:]
+	}
+}
+
+func (m *PersistentMemoryTrackingHandler) HandlePriceUpdate(item []PriceUpdateItem) {
+	for _, item := range item {
+		log.Printf("Price update %d, url: %s", item.Id, "https://www.elgiganten.se"+item.Url)
+
 	}
 }
 

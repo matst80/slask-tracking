@@ -74,6 +74,34 @@ func (t *RabbitTransportClient) ConnectUpdates(handler view.UpdateHandler) error
 	return nil
 }
 
+func (t *RabbitTransportClient) ConnectPriceUpdates(handler view.PriceUpdateHandler) error {
+
+	conn, err := amqp.Dial(t.Url)
+	if err != nil {
+		return err
+	}
+	ch, err := conn.Channel()
+	if err != nil {
+		return err
+	}
+
+	toAdd, err := t.declareBindAndConsume(ch, "price_lowered")
+	if err != nil {
+		return err
+	}
+
+	for d := range toAdd {
+		//log.Printf("Got upsert message")
+		var items []view.PriceUpdateItem
+		if err := json.Unmarshal(d.Body, &items); err == nil {
+			handler.HandlePriceUpdate(items)
+		} else {
+			log.Printf("Failed to unmarshal upset message %v", err)
+		}
+	}
+	return nil
+}
+
 func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 	conn, err := amqp.Dial(t.Url)
 

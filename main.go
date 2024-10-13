@@ -28,6 +28,7 @@ func run_application() int {
 	defer viewHandler.Save()
 	go client.Connect(viewHandler)
 	go client.ConnectUpdates(viewHandler)
+	go client.ConnectPriceUpdates(viewHandler)
 	viewHandler.ConnectPopularityListener(popularityHandler)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
