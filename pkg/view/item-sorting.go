@@ -2,39 +2,11 @@ package view
 
 import (
 	"context"
-	"fmt"
 	"log"
-	"strings"
 
+	"github.com/matst80/slask-finder/pkg/index"
 	"github.com/redis/go-redis/v9"
 )
-
-type SortOverride map[uint]float64
-
-func (s *SortOverride) ToString() string {
-	ret := ""
-	for key, value := range *s {
-		ret += fmt.Sprintf("%d:%f,", key, value)
-	}
-	return ret
-}
-
-func (s *SortOverride) FromString(data string) error {
-	*s = make(map[uint]float64)
-	for _, item := range strings.Split(data, ",") {
-		var key uint
-		var value float64
-		_, err := fmt.Sscanf(item, "%d:%f", &key, &value)
-		if err != nil {
-			if err.Error() == "EOF" {
-				return nil
-			}
-			return err
-		}
-		(*s)[key] = value
-	}
-	return nil
-}
 
 type SortOverrideStorage struct {
 	client *redis.Client
@@ -61,7 +33,7 @@ func NewSortOverrideStorage(addr string, password string, db int) *SortOverrideS
 	}
 }
 
-func (s *SortOverrideStorage) PopularityChanged(sort *SortOverride) error {
+func (s *SortOverrideStorage) PopularityChanged(sort *index.SortOverride) error {
 	data := sort.ToString()
 	_, err := s.client.Set(s.ctx, REDIS_POPULAR_KEY, data, 0).Result()
 	if err != nil {

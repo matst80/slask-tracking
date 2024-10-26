@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/matst80/slask-finder/pkg/index"
 	"github.com/matst80/slask-tracking/pkg/view"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -92,7 +93,7 @@ func (t *RabbitTransportClient) ConnectPriceUpdates(handler view.PriceUpdateHand
 
 	for d := range toAdd {
 		//log.Printf("Got upsert message")
-		var items []view.PriceUpdateItem
+		var items []index.DataItem
 		if err := json.Unmarshal(d.Body, &items); err == nil {
 			handler.HandlePriceUpdate(items)
 		} else {

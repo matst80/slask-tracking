@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/matst80/slask-finder/pkg/index"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -27,7 +28,7 @@ type UpdateHandler interface {
 }
 
 type PriceUpdateHandler interface {
-	HandlePriceUpdate(update []PriceUpdateItem)
+	HandlePriceUpdate(update []index.DataItem)
 }
 
 type PersistentMemoryTrackingHandler struct {
@@ -36,10 +37,10 @@ type PersistentMemoryTrackingHandler struct {
 	changes         uint
 	updatesToKeep   int
 	trackingHandler PopularityListener
-	ItemPopularity  SortOverride            `json:"item_popularity"`
+	ItemPopularity  index.SortOverride      `json:"item_popularity"`
 	Queries         map[string]uint         `json:"queries"`
 	Sessions        map[string]*SessionData `json:"sessions"`
-	FieldPopularity SortOverride            `json:"field_popularity"`
+	FieldPopularity index.SortOverride      `json:"field_popularity"`
 	UpdatedItems    []interface{}           `json:"updated_items"`
 }
 
@@ -71,10 +72,10 @@ func MakeMemoryTrackingHandler(path string, itemsToKeep int) *PersistentMemoryTr
 	instance, err := load(path)
 	if err != nil {
 		instance = &PersistentMemoryTrackingHandler{
-			ItemPopularity:  make(SortOverride),
+			ItemPopularity:  make(index.SortOverride),
 			Queries:         make(map[string]uint),
 			Sessions:        make(map[string]*SessionData),
-			FieldPopularity: make(SortOverride),
+			FieldPopularity: make(index.SortOverride),
 		}
 	}
 	go func() {
@@ -89,7 +90,7 @@ func MakeMemoryTrackingHandler(path string, itemsToKeep int) *PersistentMemoryTr
 	instance.changes = 0
 	instance.updatesToKeep = itemsToKeep
 	if instance.ItemPopularity == nil {
-		instance.ItemPopularity = make(SortOverride)
+		instance.ItemPopularity = make(index.SortOverride)
 	}
 	if instance.Queries == nil {
 		instance.Queries = make(map[string]uint)
@@ -98,7 +99,7 @@ func MakeMemoryTrackingHandler(path string, itemsToKeep int) *PersistentMemoryTr
 		instance.Sessions = make(map[string]*SessionData)
 	}
 	if instance.FieldPopularity == nil {
-		instance.FieldPopularity = make(SortOverride)
+		instance.FieldPopularity = make(index.SortOverride)
 	}
 	if instance.UpdatedItems == nil {
 		instance.UpdatedItems = make([]interface{}, 0)
@@ -205,14 +206,14 @@ func (m *PersistentMemoryTrackingHandler) HandleUpdate(item []interface{}) {
 	}
 }
 
-func (m *PersistentMemoryTrackingHandler) HandlePriceUpdate(item []PriceUpdateItem) {
+func (m *PersistentMemoryTrackingHandler) HandlePriceUpdate(item []index.DataItem) {
 	for _, item := range item {
 		log.Printf("Price update %d, url: %s", item.Id, "https://www.elgiganten.se"+item.Url)
 
 	}
 }
 
-func (m *PersistentMemoryTrackingHandler) GetFieldPopularity() SortOverride {
+func (m *PersistentMemoryTrackingHandler) GetFieldPopularity() index.SortOverride {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.FieldPopularity
