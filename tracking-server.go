@@ -24,7 +24,7 @@ func (ws *WebServer) TrackClick(w http.ResponseWriter, r *http.Request) {
 
 	if ws.Tracking != nil {
 		go ws.Tracking.HandleEvent(view.Event{
-			BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_CLICK, SessionId: uint32(sessionId)},
+			BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_CLICK, SessionId: sessionId},
 			Item:      uint(itemId),
 			Position:  float32(position) / 100.0,
 		})
@@ -43,7 +43,7 @@ func (ws *WebServer) TrackImpression(w http.ResponseWriter, r *http.Request) {
 	}
 	if ws.Tracking != nil {
 		ws.Tracking.HandleImpressionEvent(view.ImpressionEvent{
-			BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_IMPRESS, SessionId: uint32(sessionId)},
+			BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_IMPRESS, SessionId: sessionId},
 			Items:     data,
 		})
 	}
@@ -65,7 +65,7 @@ func (ws *WebServer) TrackAction(w http.ResponseWriter, r *http.Request) {
 	if ws.Tracking != nil && err == nil {
 
 		ws.Tracking.HandleActionEvent(view.ActionEvent{
-			BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_ACTION, SessionId: uint32(sessionId)},
+			BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_ACTION, SessionId: sessionId},
 			Item:      data.Item,
 			Action:    data.Action,
 			Reason:    data.Reason,
@@ -93,7 +93,7 @@ func (ws *WebServer) TrackCart(w http.ResponseWriter, r *http.Request) {
 	if ws.Tracking != nil && err == nil {
 
 		ws.Tracking.HandleCartEvent(view.CartEvent{
-			BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_ACTION, SessionId: uint32(sessionId)},
+			BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_ACTION, SessionId: sessionId},
 			Item:      data.Item,
 			Quantity:  data.Quantity,
 		})
