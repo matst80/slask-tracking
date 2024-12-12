@@ -258,7 +258,7 @@ func (m *PersistentMemoryTrackingHandler) HandleEvent(event Event) {
 	opsProcessed.Inc()
 	if ok {
 		session.Events = append(session.Events, event)
-		session.PopularItems[event.Item] += 1
+		session.PopularItems[event.Item] += 10
 	}
 }
 
@@ -310,13 +310,15 @@ func (m *PersistentMemoryTrackingHandler) HandleImpressionEvent(event Impression
 	opsProcessed.Inc()
 	for _, impression := range event.Items {
 		m.ItemPopularity[impression.Id] += 0.01 + float64(impression.Position)/1000
-
 	}
 	m.changes++
 	idString := fmt.Sprintf("%d", event.SessionId)
 	session, ok := m.Sessions[idString]
 	if ok {
 		session.Events = append(session.Events, event)
+		for _, impression := range event.Items {
+			session.PopularItems[impression.Id] += 1
+		}
 	}
 }
 
