@@ -108,6 +108,25 @@ func run_application() int {
 			w.Write([]byte("No session found"))
 		}
 	})
+	mux.HandleFunc("/tracking/{id}/session", func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+		sessionId, err := strconv.Atoi(id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		session := viewHandler.GetSession(sessionId)
+		if session != nil {
+			w.Header().Set("Content-Type", "application/json")
+			err := json.NewEncoder(w).Encode(session)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte("No session found"))
+		}
+	})
 	mux.HandleFunc("/track/click", trackServer.TrackClick)
 	mux.HandleFunc("/track/impressions", trackServer.TrackImpression)
 	mux.HandleFunc("/track/action", trackServer.TrackAction)
