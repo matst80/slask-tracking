@@ -3,8 +3,8 @@ module github.com/matst80/slask-tracking
 go 1.23.0
 
 require (
-	github.com/matst80/slask-finder v0.0.0-20241026144243-e2e685f7f0d1
-	github.com/prometheus/client_golang v1.20.4
+	github.com/matst80/slask-finder v0.0.0-20241212192650-61205a3e5564
+	github.com/prometheus/client_golang v1.20.5
 	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/redis/go-redis/v9 v9.6.1
 )

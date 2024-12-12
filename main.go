@@ -92,7 +92,7 @@ func run_application() int {
 		viewHandler.Save()
 		w.WriteHeader(http.StatusAccepted)
 	})
-	mux.HandleFunc("/my/session", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/tracking/my/session", func(w http.ResponseWriter, r *http.Request) {
 		sessionId := HandleSessionCookie(viewHandler, w, r)
 		session := viewHandler.GetSession(sessionId)
 		if session != nil {

@@ -47,7 +47,9 @@ type PersistentMemoryTrackingHandler struct {
 
 type SessionData struct {
 	*Session
-	Events []interface{} `json:"events"`
+	Events        []interface{} `json:"events"`
+	PopularItems  map[uint]uint
+	PopularFacets map[uint]uint
 }
 
 var (
@@ -123,7 +125,6 @@ func (s *PersistentMemoryTrackingHandler) save() error {
 		tm := time.Now()
 		limit := tm.Unix() - 60*60*24*3
 		for key, item := range s.Sessions {
-
 			if len(item.Events) < 5 || limit > item.TimeStamp {
 				delete(s.Sessions, key)
 			}
@@ -239,8 +240,10 @@ func (m *PersistentMemoryTrackingHandler) HandleSessionEvent(event Session) {
 	idString := fmt.Sprintf("%d", event.SessionId)
 	events := make([]interface{}, 0)
 	m.Sessions[idString] = &SessionData{
-		Session: &event,
-		Events:  events,
+		Session:       &event,
+		Events:        events,
+		PopularItems:  make(map[uint]uint),
+		PopularFacets: make(map[uint]uint),
 	}
 }
 
@@ -255,6 +258,7 @@ func (m *PersistentMemoryTrackingHandler) HandleEvent(event Event) {
 	opsProcessed.Inc()
 	if ok {
 		session.Events = append(session.Events, event)
+		session.PopularItems[event.Item] += 1
 	}
 }
 
@@ -283,16 +287,20 @@ func (m *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventDat
 	for _, filter := range event.Filters.StringFilter {
 		m.FieldPopularity[filter.Id] += 1
 	}
-	for _, filter := range event.Filters.IntegerFilter {
+	for _, filter := range event.Filters.RangeFilter {
 		m.FieldPopularity[filter.Id] += 1
 	}
-	for _, filter := range event.Filters.NumberFilter {
-		m.FieldPopularity[filter.Id] += 1
-	}
+
 	idString := fmt.Sprintf("%d", event.SessionId)
 	session, ok := m.Sessions[idString]
 	if ok {
 		session.Events = append(session.Events, event)
+		for _, filter := range event.Filters.StringFilter {
+			session.PopularFacets[filter.Id] += 1
+		}
+		for _, filter := range event.Filters.RangeFilter {
+			session.PopularFacets[filter.Id] += 1
+		}
 	}
 }
 
