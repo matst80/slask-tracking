@@ -8,8 +8,13 @@ const (
 	EVENT_ITEM_IMPRESS  = uint16(5)
 	EVENT_ITEM_ACTION   = uint16(6)
 	EVENT_SEARCH        = uint16(1)
-	EVENT_CART          = uint16(7)
-	EVENT_PURCHASE      = uint16(8)
+)
+
+const (
+	CART_ADD            = uint16(11)
+	CART_REMOVE         = uint16(12)
+	CART_CLEAR          = uint16(13)
+	CART_ENTER_CHECKOUT = uint16(14)
 )
 
 type BaseEvent struct {
