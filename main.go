@@ -23,11 +23,13 @@ func generateSessionId() int {
 	return int(time.Now().UnixNano())
 }
 
-func setSessionCookie(w http.ResponseWriter, session_id int) {
+func setSessionCookie(w http.ResponseWriter, r *http.Request, session_id int) {
 	http.SetCookie(w, &http.Cookie{
-		Name:  "sid",
-		Value: fmt.Sprintf("%d", session_id),
-		Path:  "/", //MaxAge: 7200
+		Name:   "sid",
+		Value:  fmt.Sprintf("%d", session_id),
+		Domain: r.Host,
+		MaxAge: 2592000000,
+		Path:   "/", //MaxAge: 7200
 	})
 }
 
@@ -53,12 +55,12 @@ func HandleSessionCookie(h view.TrackingHandler, w http.ResponseWriter, r *http.
 				PragmaHeader: r.Header.Get("Pragma"),
 			})
 		}
-		setSessionCookie(w, sessionId)
+		setSessionCookie(w, r, sessionId)
 
 	} else {
 		sessionId, err = strconv.Atoi(c.Value)
 		if err != nil {
-			setSessionCookie(w, sessionId)
+			setSessionCookie(w, r, sessionId)
 		}
 	}
 	return sessionId
