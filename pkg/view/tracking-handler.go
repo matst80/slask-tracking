@@ -49,7 +49,7 @@ type SessionData struct {
 	*Session
 	Events        []interface{} `json:"events"`
 	PopularItems  map[uint]uint
-	PopularFacets map[uint]uint
+	PopularFacets map[uint][]interface{}
 }
 
 var (
@@ -120,13 +120,15 @@ func (s *PersistentMemoryTrackingHandler) save() error {
 	if s.changes == 0 {
 		return nil
 	}
-	if len(s.Sessions) > 50000 {
+	if len(s.Sessions) > 500 {
 		log.Println("Clearing sessions")
 		tm := time.Now()
-		limit := tm.Unix() - 60*60*24*3
+		limit := tm.Unix() - 60*60*24*7
 		for key, item := range s.Sessions {
 			if len(item.Events) < 5 || limit > item.TimeStamp {
 				delete(s.Sessions, key)
+			} else {
+				item.Events = item.Events[max(0, len(item.Events)-50):]
 			}
 		}
 		runtime.GC()
@@ -243,7 +245,7 @@ func (m *PersistentMemoryTrackingHandler) HandleSessionEvent(event Session) {
 		Session:       &event,
 		Events:        events,
 		PopularItems:  make(map[uint]uint),
-		PopularFacets: make(map[uint]uint),
+		PopularFacets: make(map[uint][]interface{}),
 	}
 }
 
@@ -259,6 +261,7 @@ func (m *PersistentMemoryTrackingHandler) HandleEvent(event Event) {
 	if ok {
 		session.Events = append(session.Events, event)
 		session.PopularItems[event.Item] += 10
+		session.TimeStamp = time.Now().Unix()
 	}
 }
 
@@ -273,6 +276,7 @@ func (m *PersistentMemoryTrackingHandler) HandleCartEvent(event CartEvent) {
 	opsProcessed.Inc()
 	if ok {
 		session.Events = append(session.Events, event)
+		session.TimeStamp = time.Now().Unix()
 	}
 }
 
@@ -296,11 +300,12 @@ func (m *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventDat
 	if ok {
 		session.Events = append(session.Events, event)
 		for _, filter := range event.Filters.StringFilter {
-			session.PopularFacets[filter.Id] += 1
+			session.PopularFacets[filter.Id] = append(session.PopularFacets[filter.Id], filter.Value)
 		}
 		for _, filter := range event.Filters.RangeFilter {
-			session.PopularFacets[filter.Id] += 1
+			session.PopularFacets[filter.Id] = append(session.PopularFacets[filter.Id], filter)
 		}
+		session.TimeStamp = time.Now().Unix()
 	}
 }
 
@@ -319,6 +324,7 @@ func (m *PersistentMemoryTrackingHandler) HandleImpressionEvent(event Impression
 		for _, impression := range event.Items {
 			session.PopularItems[impression.Id] += 1
 		}
+		session.TimeStamp = time.Now().Unix()
 	}
 }
 
@@ -330,5 +336,6 @@ func (m *PersistentMemoryTrackingHandler) HandleActionEvent(event ActionEvent) {
 	session, ok := m.Sessions[idString]
 	if ok {
 		session.Events = append(session.Events, event)
+		session.TimeStamp = time.Now().Unix()
 	}
 }
