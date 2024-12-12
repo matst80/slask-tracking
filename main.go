@@ -2,8 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/matst80/slask-tracking/pkg/events"
 	"github.com/matst80/slask-tracking/pkg/view"
@@ -15,6 +19,51 @@ var rabbitUrl = os.Getenv("RABBIT_URL")
 var redisUrl = os.Getenv("REDIS_URL")
 var redisPassword = os.Getenv("REDIS_PASSWORD")
 
+func generateSessionId() int {
+	return int(time.Now().UnixNano())
+}
+
+func setSessionCookie(w http.ResponseWriter, session_id int) {
+	http.SetCookie(w, &http.Cookie{
+		Name:  "sid",
+		Value: fmt.Sprintf("%d", session_id),
+		Path:  "/", //MaxAge: 7200
+	})
+}
+
+func HandleSessionCookie(h view.TrackingHandler, w http.ResponseWriter, r *http.Request) int {
+	sessionId := generateSessionId()
+	c, err := r.Cookie("sid")
+	if err != nil {
+		// fmt.Printf("Failed to get cookie %v", err)
+		if h != nil {
+			ip := r.Header.Get("X-Real-Ip")
+			if ip == "" {
+				ip = r.Header.Get("X-Forwarded-For")
+			}
+			if ip == "" {
+				ip = r.RemoteAddr
+			}
+
+			go h.HandleSessionEvent(view.Session{
+				BaseEvent:    &view.BaseEvent{Event: view.EVENT_SESSION_START, SessionId: uint32(sessionId)},
+				Language:     r.Header.Get("Accept-Language"),
+				UserAgent:    r.UserAgent(),
+				Ip:           ip,
+				PragmaHeader: r.Header.Get("Pragma"),
+			})
+		}
+		setSessionCookie(w, sessionId)
+
+	} else {
+		sessionId, err = strconv.Atoi(c.Value)
+		if err != nil {
+			setSessionCookie(w, sessionId)
+		}
+	}
+	return sessionId
+}
+
 func run_application() int {
 	client := events.RabbitTransportClient{
 		RabbitTrackingConfig: events.RabbitTrackingConfig{
@@ -25,6 +74,9 @@ func run_application() int {
 	}
 	viewHandler := view.MakeMemoryTrackingHandler("data/tracking.json", 500)
 	popularityHandler := view.NewSortOverrideStorage(redisUrl, redisPassword, 0)
+	trackServer := WebServer{
+		Tracking: viewHandler,
+	}
 	defer viewHandler.Save()
 	go client.Connect(viewHandler)
 	go client.ConnectUpdates(viewHandler)
@@ -38,6 +90,23 @@ func run_application() int {
 		viewHandler.Save()
 		w.WriteHeader(http.StatusAccepted)
 	})
+	mux.HandleFunc("/my/session", func(w http.ResponseWriter, r *http.Request) {
+		sessionId := HandleSessionCookie(viewHandler, w, r)
+		session := viewHandler.GetSession(sessionId)
+		if session != nil {
+			w.Header().Set("Content-Type", "application/json")
+			err := json.NewEncoder(w).Encode(session)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+	mux.HandleFunc("/track/click", trackServer.TrackClick)
+	mux.HandleFunc("/track/impressions", trackServer.TrackImpression)
+	mux.HandleFunc("/track/action", trackServer.TrackAction)
+	mux.HandleFunc("/track/cart", trackServer.TrackCart)
 	mux.HandleFunc("/tracking/popularity", func(w http.ResponseWriter, r *http.Request) {
 		result := viewHandler.GetItemPopularity()
 		w.Header().Set("Content-Type", "application/json")
@@ -80,6 +149,7 @@ func run_application() int {
 		}
 	})
 	mux.Handle("/metrics", promhttp.Handler())
+	log.Println("Starting server on port 8080")
 	err := http.ListenAndServe(":8080", mux)
 	if err != nil {
 		return 1

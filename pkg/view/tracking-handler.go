@@ -21,6 +21,7 @@ type TrackingHandler interface {
 	HandleCartEvent(event CartEvent)
 	HandleImpressionEvent(event ImpressionEvent)
 	HandleActionEvent(event ActionEvent)
+	GetSession(sessionId int) *SessionData
 }
 
 type UpdateHandler interface {
@@ -33,7 +34,7 @@ type PriceUpdateHandler interface {
 
 type PersistentMemoryTrackingHandler struct {
 	path            string
-	mu              sync.Mutex
+	mu              sync.RWMutex
 	changes         uint
 	updatesToKeep   int
 	trackingHandler PopularityListener
@@ -117,7 +118,7 @@ func (s *PersistentMemoryTrackingHandler) save() error {
 	if s.changes == 0 {
 		return nil
 	}
-	if len(s.Sessions) > 5000 {
+	if len(s.Sessions) > 50000 {
 		log.Println("Clearing sessions")
 		tm := time.Now()
 		limit := tm.Unix() - 60*60*24*3
@@ -148,6 +149,17 @@ func load(path string) (*PersistentMemoryTrackingHandler, error) {
 	result := &PersistentMemoryTrackingHandler{}
 	err = json.NewDecoder(file).Decode(result)
 	return result, err
+}
+
+func (s *PersistentMemoryTrackingHandler) GetSession(sessionId int) *SessionData {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	idString := fmt.Sprintf("%d", sessionId)
+	session, ok := s.Sessions[idString]
+	if ok {
+		return session
+	}
+	return nil
 }
 
 func (s *PersistentMemoryTrackingHandler) writeFile(path string) error {
@@ -209,7 +221,6 @@ func (m *PersistentMemoryTrackingHandler) HandleUpdate(item []interface{}) {
 func (m *PersistentMemoryTrackingHandler) HandlePriceUpdate(item []index.DataItem) {
 	for _, item := range item {
 		log.Printf("Price update %d, url: %s", item.Id, "https://www.elgiganten.se"+item.Url)
-
 	}
 }
 

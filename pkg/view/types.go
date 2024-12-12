@@ -2,6 +2,16 @@ package view
 
 import "github.com/matst80/slask-finder/pkg/index"
 
+const (
+	EVENT_SESSION_START = uint16(0)
+	EVENT_ITEM_CLICK    = uint16(2)
+	EVENT_ITEM_IMPRESS  = uint16(5)
+	EVENT_ITEM_ACTION   = uint16(6)
+	EVENT_SEARCH        = uint16(1)
+	EVENT_CART          = uint16(7)
+	EVENT_PURCHASE      = uint16(8)
+)
+
 type BaseEvent struct {
 	TimeStamp int64  `json:"ts"`
 	SessionId uint32 `json:"session_id"`
@@ -28,6 +38,16 @@ type CartEvent struct {
 	Quantity uint `json:"quantity"`
 }
 
+type Purchase struct {
+	Id       uint `json:"item"`
+	Quantity uint `json:"quantity"`
+}
+
+type PurchaseEvent struct {
+	*BaseEvent
+	Items []Purchase `json:"items"`
+}
+
 type SearchEventData struct {
 	*BaseEvent
 	*index.Filters
@@ -51,6 +71,7 @@ type ImpressionEvent struct {
 
 type ActionEvent struct {
 	*BaseEvent
+	Item   uint   `json:"id"`
 	Action string `json:"action"`
 	Reason string `json:"reason"`
 }
