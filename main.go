@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/matst80/slask-tracking/pkg/events"
@@ -27,7 +28,7 @@ func setSessionCookie(w http.ResponseWriter, r *http.Request, session_id int) {
 	http.SetCookie(w, &http.Cookie{
 		Name:   "sid",
 		Value:  fmt.Sprintf("%d", session_id),
-		Domain: r.Host,
+		Domain: strings.TrimPrefix(r.Host, "."),
 		MaxAge: 2592000000,
 		Path:   "/", //MaxAge: 7200
 	})
@@ -103,6 +104,7 @@ func run_application() int {
 			}
 		} else {
 			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte("No session found"))
 		}
 	})
 	mux.HandleFunc("/track/click", trackServer.TrackClick)
