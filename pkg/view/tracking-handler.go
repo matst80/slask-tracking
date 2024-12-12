@@ -238,7 +238,7 @@ func (m *PersistentMemoryTrackingHandler) HandleSessionEvent(event Session) {
 	m.changes++
 	opsProcessed.Inc()
 	idString := fmt.Sprintf("%d", event.SessionId)
-	events := make([]interface{}, 0)
+	events := make([]interface{}, 0, 200)
 	m.Sessions[idString] = &SessionData{
 		Session:       &event,
 		Events:        events,
