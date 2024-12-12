@@ -29,6 +29,7 @@ func setSessionCookie(w http.ResponseWriter, r *http.Request, session_id int) {
 		Name:     "sid",
 		Value:    fmt.Sprintf("%d", session_id),
 		HttpOnly: true,
+		SameSite: http.SameSiteNoneMode,
 		Domain:   strings.TrimPrefix(r.Host, "."),
 		MaxAge:   2592000000,
 		Path:     "/", //MaxAge: 7200
