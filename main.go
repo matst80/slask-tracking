@@ -26,11 +26,12 @@ func generateSessionId() int {
 
 func setSessionCookie(w http.ResponseWriter, r *http.Request, session_id int) {
 	http.SetCookie(w, &http.Cookie{
-		Name:   "sid",
-		Value:  fmt.Sprintf("%d", session_id),
-		Domain: strings.TrimPrefix(r.Host, "."),
-		MaxAge: 2592000000,
-		Path:   "/", //MaxAge: 7200
+		Name:     "sid",
+		Value:    fmt.Sprintf("%d", session_id),
+		HttpOnly: true,
+		Domain:   strings.TrimPrefix(r.Host, "."),
+		MaxAge:   2592000000,
+		Path:     "/", //MaxAge: 7200
 	})
 }
 
