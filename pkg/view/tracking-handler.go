@@ -47,7 +47,7 @@ type PersistentMemoryTrackingHandler struct {
 type SessionData struct {
 	*SessionContent
 	Events        []interface{} `json:"events"`
-	PopularItems  map[uint]uint
+	PopularItems  index.SortOverride
 	PopularFacets map[uint][]interface{}
 	Created       int64 `json:"ts"`
 	LastUpdate    int64 `json:"last_update"`
@@ -131,7 +131,7 @@ func (s *PersistentMemoryTrackingHandler) save() error {
 		tm := time.Now()
 		limit := tm.Unix() - 60*60*24*7
 		for key, item := range s.Sessions {
-			if len(item.Events) < 5 || limit > item.LastUpdate {
+			if len(item.Events) < 10 || limit > item.LastUpdate {
 				delete(s.Sessions, key)
 			} else {
 				item.Events = item.Events[max(0, len(item.Events)-50):]
@@ -248,7 +248,7 @@ func (m *PersistentMemoryTrackingHandler) HandleSessionEvent(event Session) {
 		Created:        time.Now().Unix(),
 		LastUpdate:     time.Now().Unix(),
 		Events:         events,
-		PopularItems:   make(map[uint]uint),
+		PopularItems:   make(index.SortOverride),
 		PopularFacets:  make(map[uint][]interface{}),
 	}
 }
@@ -257,7 +257,7 @@ func (m *PersistentMemoryTrackingHandler) HandleEvent(event Event) {
 	// log.Printf("Event SessionId: %d, ItemId: %d, Position: %f", event.SessionId, event.Item, event.Position)
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.ItemPopularity[event.Item] += 1
+	m.ItemPopularity[event.Item] += 100.0
 	m.updateSession(event, event.SessionId)
 
 	m.changes++
@@ -268,7 +268,7 @@ func (m *PersistentMemoryTrackingHandler) HandleCartEvent(event CartEvent) {
 	// log.Printf("Cart event SessionId: %d, ItemId: %d, Quantity: %d", event.SessionId, event.Item, event.Quantity)
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.ItemPopularity[event.Item] += 10
+	m.ItemPopularity[event.Item] += 190
 	m.changes++
 	go opsProcessed.Inc()
 	m.updateSession(event, event.SessionId)
@@ -300,7 +300,7 @@ func (m *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessi
 		session.LastUpdate = time.Now().Unix()
 		switch e := event.(type) {
 		case Event:
-			session.PopularItems[e.Item] += 10
+			session.PopularItems[e.Item] += 509
 
 		case SearchEventData:
 			for _, filter := range e.Filters.StringFilter {
@@ -314,13 +314,16 @@ func (m *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessi
 				session.PopularItems[impression.Id] += 1
 			}
 		case CartEvent:
-			session.PopularItems[e.Item] += 15
+			session.PopularItems[e.Item] += 150
 		case ActionEvent:
-			session.PopularItems[e.Item] += 8
+			session.PopularItems[e.Item] += 80
 		case PurchaseEvent:
 			for _, purchase := range e.Items {
-				session.PopularItems[purchase.Id] += 100
+				session.PopularItems[purchase.Id] += 1000
 			}
+		}
+		if m.trackingHandler != nil {
+			m.trackingHandler.SessionPopularityChanged(sessionId, &session.PopularItems)
 		}
 	}
 }

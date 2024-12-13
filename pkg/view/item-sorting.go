@@ -19,6 +19,9 @@ const REDIS_POPULAR_CHANGE = "popularChange"
 const REDIS_FIELD_KEY = "_field"
 const REDIS_FIELD_CHANGE = "fieldChange"
 
+const REDIS_SESSION_POPULAR_CHANGE = "sessionChange"
+const REDIS_SESSION_FIELD_CHANGE = "sessionFieldChange"
+
 func NewSortOverrideStorage(addr string, password string, db int) *SortOverrideStorage {
 	ctx := context.Background()
 
@@ -57,6 +60,24 @@ func (s *SortOverrideStorage) FieldPopularityChanged(sort *index.SortOverride) e
 	_, err = s.client.Publish(s.ctx, REDIS_FIELD_CHANGE, "external").Result()
 	if err == nil {
 		log.Println("Published field popularity change")
+	}
+	return err
+}
+
+func (s *SortOverrideStorage) SessionPopularityChanged(sort *index.SortOverride) error {
+	data := sort.ToString()
+	_, err := s.client.Publish(s.ctx, REDIS_SESSION_POPULAR_CHANGE, data).Result()
+	if err == nil {
+		log.Println("Published session popularity change")
+	}
+	return err
+}
+
+func (s *SortOverrideStorage) SessionFieldPopularityChanged(sort *index.SortOverride) error {
+	data := sort.ToString()
+	_, err := s.client.Publish(s.ctx, REDIS_SESSION_FIELD_CHANGE, data).Result()
+	if err == nil {
+		log.Println("Published session field popularity change")
 	}
 	return err
 }
