@@ -140,6 +140,7 @@ func (s *PersistentMemoryTrackingHandler) save() error {
 	err := s.writeFile(s.path)
 	if s.trackingHandler != nil {
 		go s.trackingHandler.PopularityChanged(&s.ItemPopularity)
+		go s.trackingHandler.FieldPopularityChanged(&s.FieldPopularity)
 	}
 	return err
 }

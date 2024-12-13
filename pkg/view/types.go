@@ -66,6 +66,7 @@ type SearchEventData struct {
 
 type PopularityListener interface {
 	PopularityChanged(sort *index.SortOverride) error
+	FieldPopularityChanged(sort *index.SortOverride) error
 }
 
 type Impression struct {
