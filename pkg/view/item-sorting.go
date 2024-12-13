@@ -2,6 +2,7 @@ package view
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	"github.com/matst80/slask-finder/pkg/index"
@@ -64,18 +65,28 @@ func (s *SortOverrideStorage) FieldPopularityChanged(sort *index.SortOverride) e
 	return err
 }
 
-func (s *SortOverrideStorage) SessionPopularityChanged(sort *index.SortOverride) error {
+func (s *SortOverrideStorage) SessionPopularityChanged(sessionId int, sort *index.SortOverride) error {
 	data := sort.ToString()
-	_, err := s.client.Publish(s.ctx, REDIS_SESSION_POPULAR_CHANGE, data).Result()
+	id := fmt.Sprintf("_field_%d", sessionId)
+	_, err := s.client.Set(s.ctx, id, data, 0).Result()
+	if err != nil {
+		return err
+	}
+	_, err = s.client.Publish(s.ctx, REDIS_SESSION_POPULAR_CHANGE, id).Result()
 	if err == nil {
 		log.Println("Published session popularity change")
 	}
 	return err
 }
 
-func (s *SortOverrideStorage) SessionFieldPopularityChanged(sort *index.SortOverride) error {
+func (s *SortOverrideStorage) SessionFieldPopularityChanged(sessionId int, sort *index.SortOverride) error {
 	data := sort.ToString()
-	_, err := s.client.Publish(s.ctx, REDIS_SESSION_FIELD_CHANGE, data).Result()
+	id := fmt.Sprintf("_field_%d", sessionId)
+	_, err := s.client.Set(s.ctx, id, data, 0).Result()
+	if err != nil {
+		return err
+	}
+	_, err = s.client.Publish(s.ctx, REDIS_SESSION_FIELD_CHANGE, id).Result()
 	if err == nil {
 		log.Println("Published session field popularity change")
 	}
