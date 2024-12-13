@@ -1,14 +1,10 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
-	"time"
 
 	"github.com/matst80/slask-tracking/pkg/events"
 	"github.com/matst80/slask-tracking/pkg/view"
@@ -20,58 +16,6 @@ var rabbitUrl = os.Getenv("RABBIT_URL")
 var redisUrl = os.Getenv("REDIS_URL")
 var redisPassword = os.Getenv("REDIS_PASSWORD")
 
-func generateSessionId() int {
-	return int(time.Now().UnixNano())
-}
-
-func setSessionCookie(w http.ResponseWriter, r *http.Request, session_id int) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     "sid",
-		Value:    fmt.Sprintf("%d", session_id),
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteNoneMode,
-		Domain:   strings.TrimPrefix(r.Host, "."),
-		MaxAge:   2592000000,
-		Path:     "/", //MaxAge: 7200
-	})
-}
-
-func HandleSessionCookie(h view.TrackingHandler, w http.ResponseWriter, r *http.Request) int {
-	sessionId := generateSessionId()
-	c, err := r.Cookie("sid")
-	if err != nil {
-		// fmt.Printf("Failed to get cookie %v", err)
-		if h != nil {
-			ip := r.Header.Get("X-Real-Ip")
-			if ip == "" {
-				ip = r.Header.Get("X-Forwarded-For")
-			}
-			if ip == "" {
-				ip = r.RemoteAddr
-			}
-
-			go h.HandleSessionEvent(view.Session{
-				BaseEvent: &view.BaseEvent{Event: view.EVENT_SESSION_START, SessionId: sessionId},
-				SessionContent: view.SessionContent{
-					Language:     r.Header.Get("Accept-Language"),
-					UserAgent:    r.UserAgent(),
-					Ip:           ip,
-					PragmaHeader: r.Header.Get("Pragma"),
-				},
-			})
-		}
-		setSessionCookie(w, r, sessionId)
-
-	} else {
-		sessionId, err = strconv.Atoi(c.Value)
-		if err != nil {
-			setSessionCookie(w, r, sessionId)
-		}
-	}
-	return sessionId
-}
-
 func run_application() int {
 	client := events.RabbitTransportClient{
 		RabbitTrackingConfig: events.RabbitTrackingConfig{
@@ -82,9 +26,7 @@ func run_application() int {
 	}
 	viewHandler := view.MakeMemoryTrackingHandler("data/tracking.json", 500)
 	popularityHandler := view.NewSortOverrideStorage(redisUrl, redisPassword, 0)
-	trackServer := WebServer{
-		Tracking: viewHandler,
-	}
+
 	defer viewHandler.Save()
 	go client.Connect(viewHandler)
 	go client.ConnectUpdates(viewHandler)
@@ -98,84 +40,38 @@ func run_application() int {
 		viewHandler.Save()
 		w.WriteHeader(http.StatusAccepted)
 	})
-	mux.HandleFunc("/tracking/my/session", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/tracking/my/session", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		sessionId := HandleSessionCookie(viewHandler, w, r)
-		session := viewHandler.GetSession(sessionId)
-		if session != nil {
-			w.Header().Set("Content-Type", "application/json")
-			err := json.NewEncoder(w).Encode(session)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			}
-		} else {
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte("No session found"))
-		}
-	})
-	mux.HandleFunc("/tracking/{id}/session", func(w http.ResponseWriter, r *http.Request) {
+		return viewHandler.GetSession(sessionId), nil
+	}))
+	mux.HandleFunc("/tracking/{id}/session", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		id := r.PathValue("id")
 		sessionId, err := strconv.Atoi(id)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
+			return nil, err
 		}
-		session := viewHandler.GetSession(sessionId)
-		if session != nil {
-			w.Header().Set("Content-Type", "application/json")
-			err := json.NewEncoder(w).Encode(session)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			}
-		} else {
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte("No session found"))
-		}
-	})
-	mux.HandleFunc("/track/click", trackServer.TrackClick)
-	mux.HandleFunc("/track/impressions", trackServer.TrackImpression)
-	mux.HandleFunc("/track/action", trackServer.TrackAction)
-	mux.HandleFunc("/track/cart", trackServer.TrackCart)
-	mux.HandleFunc("/tracking/popularity", func(w http.ResponseWriter, r *http.Request) {
-		result := viewHandler.GetItemPopularity()
-		w.Header().Set("Content-Type", "application/json")
-		err := json.NewEncoder(w).Encode(result)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	})
-	mux.HandleFunc("/tracking/field-popularity", func(w http.ResponseWriter, r *http.Request) {
-		result := viewHandler.GetFieldPopularity()
-		w.Header().Set("Content-Type", "application/json")
-		err := json.NewEncoder(w).Encode(result)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	})
+		return viewHandler.GetSession(sessionId), nil
+	}))
+	mux.HandleFunc("/track/click", TrackHandler(viewHandler, TrackClick))
+	mux.HandleFunc("/track/impressions", TrackHandler(viewHandler, TrackImpression))
+	mux.HandleFunc("/track/action", TrackHandler(viewHandler, TrackAction))
+	mux.HandleFunc("/track/cart", TrackHandler(viewHandler, TrackCart))
+	mux.HandleFunc("/tracking/popularity", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+		return viewHandler.GetItemPopularity(), nil
+	}))
+	mux.HandleFunc("/tracking/field-popularity", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+		return viewHandler.GetFieldPopularity(), nil
+	}))
 
-	mux.HandleFunc("/tracking/queries", func(w http.ResponseWriter, r *http.Request) {
-		result := viewHandler.GetQueries()
-		w.Header().Set("Content-Type", "application/json")
-		err := json.NewEncoder(w).Encode(result)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	})
-	mux.HandleFunc("/tracking/updated", func(w http.ResponseWriter, r *http.Request) {
-		result := viewHandler.GetUpdatedItems()
-		w.Header().Set("Content-Type", "application/json")
-		err := json.NewEncoder(w).Encode(result)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	})
-	mux.HandleFunc("/tracking/sessions", func(w http.ResponseWriter, r *http.Request) {
-		result := viewHandler.GetSessions()
-		w.Header().Set("Content-Type", "application/json")
-		err := json.NewEncoder(w).Encode(result)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	})
+	mux.HandleFunc("/tracking/queries", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+		return viewHandler.GetQueries(), nil
+	}))
+	mux.HandleFunc("/tracking/updated", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+		return viewHandler.GetUpdatedItems(), nil
+	}))
+	mux.HandleFunc("/tracking/sessions", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+		return viewHandler.GetSessions(), nil
+	}))
 	mux.Handle("/metrics", promhttp.Handler())
 	log.Println("Starting server on port 8080")
 	err := http.ListenAndServe(":8080", mux)
