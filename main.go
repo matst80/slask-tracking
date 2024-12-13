@@ -52,11 +52,13 @@ func HandleSessionCookie(h view.TrackingHandler, w http.ResponseWriter, r *http.
 			}
 
 			go h.HandleSessionEvent(view.Session{
-				BaseEvent:    &view.BaseEvent{Event: view.EVENT_SESSION_START, SessionId: sessionId},
-				Language:     r.Header.Get("Accept-Language"),
-				UserAgent:    r.UserAgent(),
-				Ip:           ip,
-				PragmaHeader: r.Header.Get("Pragma"),
+				BaseEvent: &view.BaseEvent{Event: view.EVENT_SESSION_START, SessionId: sessionId},
+				SessionContent: view.SessionContent{
+					Language:     r.Header.Get("Accept-Language"),
+					UserAgent:    r.UserAgent(),
+					Ip:           ip,
+					PragmaHeader: r.Header.Get("Pragma"),
+				},
 			})
 		}
 		setSessionCookie(w, r, sessionId)

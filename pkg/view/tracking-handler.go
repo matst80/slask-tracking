@@ -2,7 +2,6 @@ package view
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"os"
 	"runtime"
@@ -38,18 +37,20 @@ type PersistentMemoryTrackingHandler struct {
 	changes         uint
 	updatesToKeep   int
 	trackingHandler PopularityListener
-	ItemPopularity  index.SortOverride      `json:"item_popularity"`
-	Queries         map[string]uint         `json:"queries"`
-	Sessions        map[string]*SessionData `json:"sessions"`
-	FieldPopularity index.SortOverride      `json:"field_popularity"`
-	UpdatedItems    []interface{}           `json:"updated_items"`
+	ItemPopularity  index.SortOverride   `json:"item_popularity"`
+	Queries         map[string]uint      `json:"queries"`
+	Sessions        map[int]*SessionData `json:"sessions"`
+	FieldPopularity index.SortOverride   `json:"field_popularity"`
+	UpdatedItems    []interface{}        `json:"updated_items"`
 }
 
 type SessionData struct {
-	*Session
+	*SessionContent
 	Events        []interface{} `json:"events"`
 	PopularItems  map[uint]uint
 	PopularFacets map[uint][]interface{}
+	Created       int64 `json:"ts"`
+	LastUpdate    int64 `json:"last_update"`
 }
 
 var (
@@ -77,7 +78,7 @@ func MakeMemoryTrackingHandler(path string, itemsToKeep int) *PersistentMemoryTr
 		instance = &PersistentMemoryTrackingHandler{
 			ItemPopularity:  make(index.SortOverride),
 			Queries:         make(map[string]uint),
-			Sessions:        make(map[string]*SessionData),
+			Sessions:        make(map[int]*SessionData),
 			FieldPopularity: make(index.SortOverride),
 		}
 	}
@@ -99,7 +100,7 @@ func MakeMemoryTrackingHandler(path string, itemsToKeep int) *PersistentMemoryTr
 		instance.Queries = make(map[string]uint)
 	}
 	if instance.Sessions == nil {
-		instance.Sessions = make(map[string]*SessionData)
+		instance.Sessions = make(map[int]*SessionData)
 	}
 	if instance.FieldPopularity == nil {
 		instance.FieldPopularity = make(index.SortOverride)
@@ -117,21 +118,21 @@ func (s *PersistentMemoryTrackingHandler) Save() {
 func (s *PersistentMemoryTrackingHandler) save() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	defer runtime.GC()
 	if s.changes == 0 {
 		return nil
 	}
 	if len(s.Sessions) > 500 {
-		log.Println("Clearing sessions")
+		log.Println("Cleaning sessions")
 		tm := time.Now()
 		limit := tm.Unix() - 60*60*24*7
 		for key, item := range s.Sessions {
-			if len(item.Events) < 5 || limit > item.TimeStamp {
+			if len(item.Events) < 5 || limit > item.LastUpdate {
 				delete(s.Sessions, key)
 			} else {
 				item.Events = item.Events[max(0, len(item.Events)-50):]
 			}
 		}
-		runtime.GC()
 	}
 	log.Println("Saving tracking data")
 
@@ -157,8 +158,7 @@ func load(path string) (*PersistentMemoryTrackingHandler, error) {
 func (s *PersistentMemoryTrackingHandler) GetSession(sessionId int) *SessionData {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	idString := fmt.Sprintf("%d", sessionId)
-	session, ok := s.Sessions[idString]
+	session, ok := s.Sessions[sessionId]
 	if ok {
 		return session
 	}
@@ -176,26 +176,26 @@ func (s *PersistentMemoryTrackingHandler) writeFile(path string) error {
 }
 
 func (m *PersistentMemoryTrackingHandler) GetItemPopularity() map[uint]float64 {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return m.ItemPopularity
 }
 
 func (m *PersistentMemoryTrackingHandler) GetUpdatedItems() []interface{} {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return m.UpdatedItems
 }
 
 func (m *PersistentMemoryTrackingHandler) GetQueries() map[string]uint {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return m.Queries
 }
 
 func (m *PersistentMemoryTrackingHandler) GetSessions() []*SessionData {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	sessions := make([]*SessionData, len(m.Sessions))
 	i := 0
 	for _, session := range m.Sessions {
@@ -228,8 +228,8 @@ func (m *PersistentMemoryTrackingHandler) HandlePriceUpdate(item []index.DataIte
 }
 
 func (m *PersistentMemoryTrackingHandler) GetFieldPopularity() index.SortOverride {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return m.FieldPopularity
 }
 
@@ -239,13 +239,15 @@ func (m *PersistentMemoryTrackingHandler) HandleSessionEvent(event Session) {
 	defer m.mu.Unlock()
 	m.changes++
 	opsProcessed.Inc()
-	idString := fmt.Sprintf("%d", event.SessionId)
+
 	events := make([]interface{}, 0, 200)
-	m.Sessions[idString] = &SessionData{
-		Session:       &event,
-		Events:        events,
-		PopularItems:  make(map[uint]uint),
-		PopularFacets: make(map[uint][]interface{}),
+	m.Sessions[event.SessionId] = &SessionData{
+		SessionContent: &event.SessionContent,
+		Created:        time.Now().Unix(),
+		LastUpdate:     time.Now().Unix(),
+		Events:         events,
+		PopularItems:   make(map[uint]uint),
+		PopularFacets:  make(map[uint][]interface{}),
 	}
 }
 
@@ -254,15 +256,10 @@ func (m *PersistentMemoryTrackingHandler) HandleEvent(event Event) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.ItemPopularity[event.Item] += 1
-	idString := fmt.Sprintf("%d", event.SessionId)
-	session, ok := m.Sessions[idString]
+	m.updateSession(event, event.SessionId)
+
 	m.changes++
-	opsProcessed.Inc()
-	if ok {
-		session.Events = append(session.Events, event)
-		session.PopularItems[event.Item] += 10
-		session.TimeStamp = time.Now().Unix()
-	}
+	go opsProcessed.Inc()
 }
 
 func (m *PersistentMemoryTrackingHandler) HandleCartEvent(event CartEvent) {
@@ -270,21 +267,16 @@ func (m *PersistentMemoryTrackingHandler) HandleCartEvent(event CartEvent) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.ItemPopularity[event.Item] += 10
-	idString := fmt.Sprintf("%d", event.SessionId)
-	session, ok := m.Sessions[idString]
 	m.changes++
-	opsProcessed.Inc()
-	if ok {
-		session.Events = append(session.Events, event)
-		session.TimeStamp = time.Now().Unix()
-	}
+	go opsProcessed.Inc()
+	m.updateSession(event, event.SessionId)
 }
 
 func (m *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventData) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.changes++
-	opsProcessed.Inc()
+	go opsProcessed.Inc()
 	if event.Query != "" {
 		m.Queries[event.Query] += 1
 	}
@@ -294,48 +286,59 @@ func (m *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventDat
 	for _, filter := range event.Filters.RangeFilter {
 		m.FieldPopularity[filter.Id] += 1
 	}
+	m.updateSession(event, event.SessionId)
 
-	idString := fmt.Sprintf("%d", event.SessionId)
-	session, ok := m.Sessions[idString]
+}
+
+func (m *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessionId int) {
+
+	session, ok := m.Sessions[sessionId]
 	if ok {
 		session.Events = append(session.Events, event)
-		for _, filter := range event.Filters.StringFilter {
-			session.PopularFacets[filter.Id] = append(session.PopularFacets[filter.Id], filter.Value)
+		session.LastUpdate = time.Now().Unix()
+		switch e := event.(type) {
+		case Event:
+			session.PopularItems[e.Item] += 10
+
+		case SearchEventData:
+			for _, filter := range e.Filters.StringFilter {
+				session.PopularFacets[filter.Id] = append(session.PopularFacets[filter.Id], filter.Value)
+			}
+			for _, filter := range e.Filters.RangeFilter {
+				session.PopularFacets[filter.Id] = append(session.PopularFacets[filter.Id], filter)
+			}
+		case ImpressionEvent:
+			for _, impression := range e.Items {
+				session.PopularItems[impression.Id] += 1
+			}
+		case CartEvent:
+			session.PopularItems[e.Item] += 15
+		case ActionEvent:
+			session.PopularItems[e.Item] += 8
+		case PurchaseEvent:
+			for _, purchase := range e.Items {
+				session.PopularItems[purchase.Id] += 100
+			}
 		}
-		for _, filter := range event.Filters.RangeFilter {
-			session.PopularFacets[filter.Id] = append(session.PopularFacets[filter.Id], filter)
-		}
-		session.TimeStamp = time.Now().Unix()
 	}
 }
 
 func (m *PersistentMemoryTrackingHandler) HandleImpressionEvent(event ImpressionEvent) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	opsProcessed.Inc()
+	go opsProcessed.Inc()
 	for _, impression := range event.Items {
 		m.ItemPopularity[impression.Id] += 0.01 + float64(impression.Position)/1000
 	}
+	m.updateSession(event, event.SessionId)
 	m.changes++
-	idString := fmt.Sprintf("%d", event.SessionId)
-	session, ok := m.Sessions[idString]
-	if ok {
-		session.Events = append(session.Events, event)
-		for _, impression := range event.Items {
-			session.PopularItems[impression.Id] += 1
-		}
-		session.TimeStamp = time.Now().Unix()
-	}
+
 }
 
 func (m *PersistentMemoryTrackingHandler) HandleActionEvent(event ActionEvent) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	go opsProcessed.Inc()
+	m.updateSession(event, event.SessionId)
 	m.changes++
-	idString := fmt.Sprintf("%d", event.SessionId)
-	session, ok := m.Sessions[idString]
-	if ok {
-		session.Events = append(session.Events, event)
-		session.TimeStamp = time.Now().Unix()
-	}
 }

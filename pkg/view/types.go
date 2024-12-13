@@ -23,12 +23,16 @@ type BaseEvent struct {
 	Event     uint16 `json:"event"`
 }
 
-type Session struct {
-	*BaseEvent
+type SessionContent struct {
 	UserAgent    string `json:"user_agent,omitempty"`
 	Ip           string `json:"ip,omitempty"`
 	Language     string `json:"language,omitempty"`
 	PragmaHeader string `json:"pragma,omitempty"`
+}
+
+type Session struct {
+	*BaseEvent
+	SessionContent
 }
 
 type Event struct {
@@ -79,4 +83,28 @@ type ActionEvent struct {
 	Item   uint   `json:"id"`
 	Action string `json:"action"`
 	Reason string `json:"reason"`
+}
+
+func (e *Session) GetType() uint16 {
+	return e.Event
+}
+
+func (e *ActionEvent) GetType() uint16 {
+	return e.Event
+}
+
+func (e *CartEvent) GetType() uint16 {
+	return e.Event
+}
+
+func (e *ImpressionEvent) GetType() uint16 {
+	return e.Event
+}
+
+func (e *PurchaseEvent) GetType() uint16 {
+	return e.Event
+}
+
+type TrackingEvent interface {
+	GetType() uint16
 }
