@@ -122,6 +122,10 @@ func (s *PersistentMemoryTrackingHandler) save() error {
 	if s.changes == 0 {
 		return nil
 	}
+	if s.trackingHandler != nil {
+		go s.trackingHandler.PopularityChanged(&s.ItemPopularity)
+		go s.trackingHandler.FieldPopularityChanged(&s.FieldPopularity)
+	}
 	if len(s.Sessions) > 500 {
 		log.Println("Cleaning sessions")
 		tm := time.Now()
@@ -138,10 +142,7 @@ func (s *PersistentMemoryTrackingHandler) save() error {
 
 	s.changes = 0
 	err := s.writeFile(s.path)
-	if s.trackingHandler != nil {
-		go s.trackingHandler.PopularityChanged(&s.ItemPopularity)
-		go s.trackingHandler.FieldPopularityChanged(&s.FieldPopularity)
-	}
+
 	return err
 }
 
