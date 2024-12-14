@@ -295,41 +295,57 @@ func (m *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventDat
 func (m *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessionId int) {
 
 	session, ok := m.Sessions[sessionId]
+	needsSync := false
+	facetsChanged := false
+	itemsChanged := false
 	if ok {
 		session.Events = append(session.Events, event)
-		session.LastUpdate = time.Now().Unix()
+		now := time.Now().Unix()
+		needsSync = now-session.LastUpdate > 30
+		session.LastUpdate = now
 		switch e := event.(type) {
 		case Event:
 			session.PopularItems[e.Item] += 509
-
+			itemsChanged = true
 		case SearchEventData:
 			for _, filter := range e.Filters.StringFilter {
 				if _, ok := session.PopularFacets[filter.Id]; !ok {
 					session.PopularFacets[filter.Id] = make([]interface{}, 0)
 				}
 				session.PopularFacets[filter.Id] = append(session.PopularFacets[filter.Id], filter.Value)
+				facetsChanged = true
 			}
 			for _, filter := range e.Filters.RangeFilter {
 				if _, ok := session.PopularFacets[filter.Id]; !ok {
 					session.PopularFacets[filter.Id] = make([]interface{}, 0)
 				}
 				session.PopularFacets[filter.Id] = append(session.PopularFacets[filter.Id], filter)
+				facetsChanged = true
 			}
 		case ImpressionEvent:
 			for _, impression := range e.Items {
-				session.PopularItems[impression.Id] += 1
+				session.PopularItems[impression.Id] += 10
 			}
+			itemsChanged = true
 		case CartEvent:
 			session.PopularItems[e.Item] += 150
+			itemsChanged = true
 		case ActionEvent:
 			session.PopularItems[e.Item] += 80
+			itemsChanged = true
 		case PurchaseEvent:
 			for _, purchase := range e.Items {
 				session.PopularItems[purchase.Id] += 1000
+				itemsChanged = true
 			}
 		}
-		if m.trackingHandler != nil {
-			m.trackingHandler.SessionPopularityChanged(sessionId, &session.PopularItems)
+		if m.trackingHandler != nil && needsSync {
+			if facetsChanged {
+				m.trackingHandler.SessionFieldPopularityChanged(sessionId, &session.PopularFacets)
+			}
+			if itemsChanged {
+				m.trackingHandler.SessionPopularityChanged(sessionId, &session.PopularItems)
+			}
 		}
 	}
 }

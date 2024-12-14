@@ -2,6 +2,7 @@ package view
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 
@@ -79,10 +80,13 @@ func (s *SortOverrideStorage) SessionPopularityChanged(sessionId int, sort *inde
 	return err
 }
 
-func (s *SortOverrideStorage) SessionFieldPopularityChanged(sessionId int, sort *index.SortOverride) error {
-	data := sort.ToString()
+func (s *SortOverrideStorage) SessionFieldPopularityChanged(sessionId int, data interface{}) error {
+	content, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
 	id := fmt.Sprintf("_field_%d", sessionId)
-	_, err := s.client.Set(s.ctx, id, data, 0).Result()
+	_, err = s.client.Set(s.ctx, id, content, 0).Result()
 	if err != nil {
 		return err
 	}
