@@ -304,9 +304,15 @@ func (m *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessi
 
 		case SearchEventData:
 			for _, filter := range e.Filters.StringFilter {
+				if _, ok := session.PopularFacets[filter.Id]; !ok {
+					session.PopularFacets[filter.Id] = make([]interface{}, 0)
+				}
 				session.PopularFacets[filter.Id] = append(session.PopularFacets[filter.Id], filter.Value)
 			}
 			for _, filter := range e.Filters.RangeFilter {
+				if _, ok := session.PopularFacets[filter.Id]; !ok {
+					session.PopularFacets[filter.Id] = make([]interface{}, 0)
+				}
 				session.PopularFacets[filter.Id] = append(session.PopularFacets[filter.Id], filter)
 			}
 		case ImpressionEvent:
