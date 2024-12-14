@@ -367,23 +367,24 @@ func (m *PersistentMemoryTrackingHandler) HandleSessionEvent(event Session) {
 }
 
 func (m *PersistentMemoryTrackingHandler) appendItemEvent(itemId uint, value float64) {
-	if _, ok := m.ItemEvents[itemId]; !ok {
-		m.ItemEvents[itemId] = make([]DecayEvent, 0)
+	if m.ItemEvents == nil {
+		m.ItemEvents = make(map[uint][]DecayEvent)
 	}
-	m.ItemEvents[itemId] = append(m.ItemEvents[itemId], DecayEvent{
+	m.ItemEvents.Add(itemId, DecayEvent{
 		TimeStamp: time.Now().Unix(),
 		Value:     value,
 	})
 }
 
 func (m *PersistentMemoryTrackingHandler) appendFieldEvent(fieldId uint, value float64) {
-	if _, ok := m.FieldEvents[fieldId]; !ok {
-		m.FieldEvents[fieldId] = make([]DecayEvent, 0)
+	if m.FieldEvents == nil {
+		m.FieldEvents = make(map[uint][]DecayEvent)
 	}
-	m.FieldEvents[fieldId] = append(m.FieldEvents[fieldId], DecayEvent{
+	m.FieldEvents.Add(fieldId, DecayEvent{
 		TimeStamp: time.Now().Unix(),
 		Value:     value,
 	})
+
 }
 
 func (m *PersistentMemoryTrackingHandler) HandleEvent(event Event) {
