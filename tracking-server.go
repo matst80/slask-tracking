@@ -10,15 +10,28 @@ import (
 
 func TrackHandler(trk view.TrackingHandler, handler func(w http.ResponseWriter, r *http.Request, sessionId int, trackingHandler view.TrackingHandler) error) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if trk == nil {
-			http.Error(w, "Tracking not enabled", http.StatusNotImplemented)
-			return
-		}
-		sessionId := HandleSessionCookie(trk, w, r)
-		err := handler(w, r, sessionId, trk)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
+		if r.Method == "OPTIONS" {
+			w.Header().Set("Cache-Control", "public, max-age=3600")
+			origin := r.Header.Get("Origin")
+			if origin != "" {
+				w.Header().Set("Access-Control-Allow-Origin", r.Header.Get("Origin"))
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "*")
+				w.Header().Set("Access-Control-Allow-Credentials", "true")
+			}
+			w.Header().Set("Age", "0")
+		} else {
+			w.Header().Set("Cache-Control", "private, stale-while-revalidate=5")
+			if trk == nil {
+				http.Error(w, "Tracking not enabled", http.StatusNotImplemented)
+				return
+			}
+			sessionId := HandleSessionCookie(trk, w, r)
+			err := handler(w, r, sessionId, trk)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
 		}
 		w.WriteHeader(http.StatusAccepted)
 	}

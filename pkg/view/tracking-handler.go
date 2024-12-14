@@ -46,11 +46,11 @@ type PersistentMemoryTrackingHandler struct {
 
 type SessionData struct {
 	*SessionContent
-	Events        []interface{} `json:"events"`
-	PopularItems  index.SortOverride
-	PopularFacets map[uint][]interface{}
-	Created       int64 `json:"ts"`
-	LastUpdate    int64 `json:"last_update"`
+	Events        []interface{}          `json:"events"`
+	PopularItems  index.SortOverride     `json:"popular_items"`
+	PopularFacets map[uint][]interface{} `json:"popular_facets"`
+	Created       int64                  `json:"ts"`
+	LastUpdate    int64                  `json:"last_update"`
 }
 
 var (
