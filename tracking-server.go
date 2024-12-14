@@ -16,6 +16,7 @@ func TrackHandler(trk view.TrackingHandler, handler func(w http.ResponseWriter, 
 			origin := r.Header.Get("Origin")
 			if origin != "" && !strings.Contains(origin, "localhost") {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Set("Access-Control-Max-Age", "86400")
 				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 				w.Header().Set("Access-Control-Allow-Headers", "*")
 				w.Header().Set("Access-Control-Allow-Credentials", "true")
