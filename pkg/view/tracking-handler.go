@@ -3,8 +3,10 @@ package view
 import (
 	"encoding/json"
 	"log"
+	"math"
 	"os"
 	"runtime"
+	"slices"
 	"sync"
 	"time"
 
@@ -31,6 +33,65 @@ type PriceUpdateHandler interface {
 	HandlePriceUpdate(update []index.DataItem)
 }
 
+type DecayEvent struct {
+	TimeStamp int64
+	Value     float64
+}
+
+const (
+	decayRate = 0.9999992
+	maxAge    = 60 * 60 * 24 * 14
+)
+
+func (d *DecayEvent) CalculateValue(now int64) float64 {
+
+	// Calculate the time difference between the event timestamp and the current time.
+	timeElapsed := now - d.TimeStamp
+	if timeElapsed < 0 {
+		// If the timestamp is in the future, return the original value.
+		return d.Value
+	}
+	if timeElapsed > maxAge {
+		return 0
+	}
+
+	// Apply exponential decay formula.
+	decayedValue := d.Value * math.Pow(decayRate, float64(timeElapsed))
+
+	return decayedValue
+}
+
+func (d *DecayEvent) Decay(now int64) float64 {
+	d.Value = d.CalculateValue(now)
+	d.TimeStamp = now
+	return d.Value
+}
+
+type DecayList map[uint][]DecayEvent
+
+func (d DecayList) Add(key uint, value DecayEvent) {
+	if _, ok := d[key]; !ok {
+		d[key] = make([]DecayEvent, 0)
+	}
+	d[key] = append(d[key], value)
+}
+
+func (d DecayList) Decay(now int64) index.SortOverride {
+	result := index.SortOverride{}
+	var popularity float64
+	for itemId, events := range d {
+		popularity = 0
+		for _, event := range events {
+			popularity += event.Decay(now)
+		}
+		result[itemId] = popularity
+		slices.DeleteFunc(events, func(i DecayEvent) bool {
+			return i.Value < 1
+		})
+	}
+	return result
+}
+
 type PersistentMemoryTrackingHandler struct {
 	path            string
 	mu              sync.RWMutex
@@ -41,16 +102,18 @@ type PersistentMemoryTrackingHandler struct {
 	Queries         map[string]uint      `json:"queries"`
 	Sessions        map[int]*SessionData `json:"sessions"`
 	FieldPopularity index.SortOverride   `json:"field_popularity"`
+	ItemEvents      DecayList            `json:"item_events"`
+	FieldEvents     DecayList            `json:"field_events"`
 	UpdatedItems    []interface{}        `json:"updated_items"`
 }
 
 type SessionData struct {
 	*SessionContent
-	Events        []interface{}          `json:"events"`
-	PopularItems  index.SortOverride     `json:"popular_items"`
-	PopularFacets map[uint][]interface{} `json:"popular_facets"`
-	Created       int64                  `json:"ts"`
-	LastUpdate    int64                  `json:"last_update"`
+	Events      []interface{} `json:"events"`
+	ItemEvents  DecayList     `json:"item_events"`
+	FieldEvents DecayList     `json:"field_events"`
+	Created     int64         `json:"ts"`
+	LastUpdate  int64         `json:"last_update"`
 }
 
 var (
@@ -76,16 +139,27 @@ func MakeMemoryTrackingHandler(path string, itemsToKeep int) *PersistentMemoryTr
 	instance, err := load(path)
 	if err != nil {
 		instance = &PersistentMemoryTrackingHandler{
+			path:            "data",
+			mu:              sync.RWMutex{},
+			changes:         0,
+			updatesToKeep:   0,
+			trackingHandler: nil,
 			ItemPopularity:  make(index.SortOverride),
 			Queries:         make(map[string]uint),
 			Sessions:        make(map[int]*SessionData),
 			FieldPopularity: make(index.SortOverride),
+			ItemEvents:      map[uint][]DecayEvent{},
+			FieldEvents:     map[uint][]DecayEvent{},
+			UpdatedItems:    make([]interface{}, 0),
 		}
 	}
 	go func() {
 		for range time.Tick(time.Minute) {
 			if instance.changes > 0 {
-				instance.save()
+				err := instance.save()
+				if err != nil {
+					log.Println(err)
+				}
 			}
 		}
 	}()
@@ -115,17 +189,40 @@ func (s *PersistentMemoryTrackingHandler) Save() {
 	s.save()
 }
 
-func (s *PersistentMemoryTrackingHandler) save() error {
+func (s *PersistentMemoryTrackingHandler) DecayEvents() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	defer runtime.GC()
-	if s.changes == 0 {
-		return nil
+	now := time.Now().Unix()
+	log.Printf("Decaying events %d", len(s.ItemEvents))
+
+	itemOverride := index.SortOverride{}
+	fieldOverride := index.SortOverride{}
+	var popularity float64
+	for itemId, events := range s.ItemEvents {
+		popularity = 0
+		for _, event := range events {
+			popularity += event.Decay(now)
+		}
+		itemOverride[itemId] = popularity
+		slices.DeleteFunc(events, func(i DecayEvent) bool {
+			return i.Value < 1
+		})
 	}
-	if s.trackingHandler != nil {
-		go s.trackingHandler.PopularityChanged(&s.ItemPopularity)
-		go s.trackingHandler.FieldPopularityChanged(&s.FieldPopularity)
+	for fieldId, events := range s.FieldEvents {
+		popularity = 0
+		for _, event := range events {
+			popularity += event.Decay(now)
+		}
+		fieldOverride[fieldId] = popularity
+		slices.DeleteFunc(events, func(i DecayEvent) bool {
+			return i.Value < 1
+		})
 	}
+}
+
+func (s PersistentMemoryTrackingHandler) cleanSessions() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if len(s.Sessions) > 500 {
 		log.Println("Cleaning sessions")
 		tm := time.Now()
@@ -138,6 +235,20 @@ func (s *PersistentMemoryTrackingHandler) save() error {
 			}
 		}
 	}
+}
+
+func (s *PersistentMemoryTrackingHandler) save() error {
+	s.DecayEvents()
+	s.cleanSessions()
+	defer runtime.GC()
+	if s.changes == 0 {
+		return nil
+	}
+	if s.trackingHandler != nil {
+		go s.trackingHandler.PopularityChanged(&s.ItemPopularity)
+		go s.trackingHandler.FieldPopularityChanged(&s.FieldPopularity)
+	}
+
 	log.Println("Saving tracking data")
 
 	s.changes = 0
@@ -168,6 +279,8 @@ func (s *PersistentMemoryTrackingHandler) GetSession(sessionId int) *SessionData
 }
 
 func (s *PersistentMemoryTrackingHandler) writeFile(path string) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	file, err := os.Create(path)
 	if err != nil {
 		return err
@@ -248,16 +361,37 @@ func (m *PersistentMemoryTrackingHandler) HandleSessionEvent(event Session) {
 		Created:        time.Now().Unix(),
 		LastUpdate:     time.Now().Unix(),
 		Events:         events,
-		PopularItems:   make(index.SortOverride),
-		PopularFacets:  make(map[uint][]interface{}),
+		ItemEvents:     make(map[uint][]DecayEvent),
+		FieldEvents:    make(map[uint][]DecayEvent),
 	}
+}
+
+func (m *PersistentMemoryTrackingHandler) appendItemEvent(itemId uint, value float64) {
+	if _, ok := m.ItemEvents[itemId]; !ok {
+		m.ItemEvents[itemId] = make([]DecayEvent, 0)
+	}
+	m.ItemEvents[itemId] = append(m.ItemEvents[itemId], DecayEvent{
+		TimeStamp: time.Now().Unix(),
+		Value:     value,
+	})
+}
+
+func (m *PersistentMemoryTrackingHandler) appendFieldEvent(fieldId uint, value float64) {
+	if _, ok := m.FieldEvents[fieldId]; !ok {
+		m.FieldEvents[fieldId] = make([]DecayEvent, 0)
+	}
+	m.FieldEvents[fieldId] = append(m.FieldEvents[fieldId], DecayEvent{
+		TimeStamp: time.Now().Unix(),
+		Value:     value,
+	})
 }
 
 func (m *PersistentMemoryTrackingHandler) HandleEvent(event Event) {
 	// log.Printf("Event SessionId: %d, ItemId: %d, Position: %f", event.SessionId, event.Item, event.Position)
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.ItemPopularity[event.Item] += 100.0
+	m.appendItemEvent(event.Item, 100)
+
 	m.updateSession(event, event.SessionId)
 
 	m.changes++
@@ -268,7 +402,7 @@ func (m *PersistentMemoryTrackingHandler) HandleCartEvent(event CartEvent) {
 	// log.Printf("Cart event SessionId: %d, ItemId: %d, Quantity: %d", event.SessionId, event.Item, event.Quantity)
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.ItemPopularity[event.Item] += 190
+	m.appendItemEvent(event.Item, 500)
 	m.changes++
 	go opsProcessed.Inc()
 	m.updateSession(event, event.SessionId)
@@ -282,11 +416,12 @@ func (m *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventDat
 	if event.Query != "" {
 		m.Queries[event.Query] += 1
 	}
+
 	for _, filter := range event.Filters.StringFilter {
-		m.FieldPopularity[filter.Id] += 1
+		m.appendFieldEvent(filter.Id, 10)
 	}
 	for _, filter := range event.Filters.RangeFilter {
-		m.FieldPopularity[filter.Id] += 1
+		m.appendFieldEvent(filter.Id, 10)
 	}
 	m.updateSession(event, event.SessionId)
 
@@ -300,51 +435,69 @@ func (m *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessi
 	itemsChanged := false
 	if ok {
 		session.Events = append(session.Events, event)
-		now := time.Now().Unix()
-		needsSync = now-session.LastUpdate > 30
+		now := time.Now().Unix() / 60
+		needsSync = now-session.LastUpdate > 0
 		session.LastUpdate = now
 		switch e := event.(type) {
 		case Event:
-			session.PopularItems[e.Item] += 509
+			session.ItemEvents.Add(e.Item, DecayEvent{
+				TimeStamp: now,
+				Value:     509,
+			})
+
 			itemsChanged = true
 		case SearchEventData:
 			for _, filter := range e.Filters.StringFilter {
-				if _, ok := session.PopularFacets[filter.Id]; !ok {
-					session.PopularFacets[filter.Id] = make([]interface{}, 0)
-				}
-				session.PopularFacets[filter.Id] = append(session.PopularFacets[filter.Id], filter.Value)
+				session.FieldEvents.Add(filter.Id, DecayEvent{
+					TimeStamp: now,
+					Value:     15,
+				})
 				facetsChanged = true
 			}
 			for _, filter := range e.Filters.RangeFilter {
-				if _, ok := session.PopularFacets[filter.Id]; !ok {
-					session.PopularFacets[filter.Id] = make([]interface{}, 0)
-				}
-				session.PopularFacets[filter.Id] = append(session.PopularFacets[filter.Id], filter)
+				session.FieldEvents.Add(filter.Id, DecayEvent{
+					TimeStamp: now,
+					Value:     10,
+				})
 				facetsChanged = true
 			}
 		case ImpressionEvent:
 			for _, impression := range e.Items {
-				session.PopularItems[impression.Id] += 10
+				session.ItemEvents.Add(impression.Id, DecayEvent{
+					TimeStamp: now,
+					Value:     0.5 * float64(impression.Position),
+				})
 			}
 			itemsChanged = true
 		case CartEvent:
-			session.PopularItems[e.Item] += 150
+			session.ItemEvents.Add(e.Item, DecayEvent{
+				TimeStamp: now,
+				Value:     700,
+			})
 			itemsChanged = true
 		case ActionEvent:
-			session.PopularItems[e.Item] += 80
+			session.ItemEvents.Add(e.Item, DecayEvent{
+				TimeStamp: now,
+				Value:     80,
+			})
 			itemsChanged = true
 		case PurchaseEvent:
 			for _, purchase := range e.Items {
-				session.PopularItems[purchase.Id] += 1000
+				session.ItemEvents.Add(purchase.Id, DecayEvent{
+					TimeStamp: now,
+					Value:     800 * float64(purchase.Quantity),
+				})
 				itemsChanged = true
 			}
 		}
 		if m.trackingHandler != nil && needsSync {
 			if facetsChanged {
-				m.trackingHandler.SessionFieldPopularityChanged(sessionId, &session.PopularFacets)
+				facetOverride := session.FieldEvents.Decay(now)
+				m.trackingHandler.SessionFieldPopularityChanged(sessionId, &facetOverride)
 			}
 			if itemsChanged {
-				m.trackingHandler.SessionPopularityChanged(sessionId, &session.PopularItems)
+				itemOverride := session.ItemEvents.Decay(now)
+				m.trackingHandler.SessionPopularityChanged(sessionId, &itemOverride)
 			}
 		}
 	}
