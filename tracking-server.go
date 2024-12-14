@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/matst80/slask-tracking/pkg/view"
 )
@@ -13,8 +14,8 @@ func TrackHandler(trk view.TrackingHandler, handler func(w http.ResponseWriter, 
 		if r.Method == "OPTIONS" {
 			w.Header().Set("Cache-Control", "public, max-age=3600")
 			origin := r.Header.Get("Origin")
-			if origin != "" {
-				w.Header().Set("Access-Control-Allow-Origin", r.Header.Get("Origin"))
+			if origin != "" && !strings.Contains(origin, "localhost") {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
 				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 				w.Header().Set("Access-Control-Allow-Headers", "*")
 				w.Header().Set("Access-Control-Allow-Credentials", "true")
