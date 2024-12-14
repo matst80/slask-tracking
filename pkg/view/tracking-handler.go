@@ -435,6 +435,12 @@ func (m *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessi
 	facetsChanged := false
 	itemsChanged := false
 	if ok {
+		if session.ItemEvents == nil {
+			session.ItemEvents = make(map[uint][]DecayEvent)
+		}
+		if session.FieldEvents == nil {
+			session.FieldEvents = make(map[uint][]DecayEvent)
+		}
 		session.Events = append(session.Events, event)
 		now := time.Now().Unix() / 60
 		needsSync = now-session.LastUpdate > 0
