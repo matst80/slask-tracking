@@ -69,17 +69,17 @@ func (d *DecayEvent) Decay(now int64) float64 {
 
 type DecayList map[uint][]DecayEvent
 
-func (d DecayList) Add(key uint, value DecayEvent) {
-	if _, ok := d[key]; !ok {
-		d[key] = make([]DecayEvent, 0)
+func (d *DecayList) Add(key uint, value DecayEvent) {
+	if _, ok := (*d)[key]; !ok {
+		(*d)[key] = make([]DecayEvent, 0)
 	}
-	d[key] = append(d[key], value)
+	(*d)[key] = append((*d)[key], value)
 }
 
-func (d DecayList) Decay(now int64) index.SortOverride {
+func (d *DecayList) Decay(now int64) index.SortOverride {
 	result := index.SortOverride{}
 	var popularity float64
-	for itemId, events := range d {
+	for itemId, events := range *d {
 		popularity = 0
 		for _, event := range events {
 			popularity += event.Decay(now)
