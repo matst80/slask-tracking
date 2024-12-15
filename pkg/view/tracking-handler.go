@@ -34,8 +34,8 @@ type PriceUpdateHandler interface {
 }
 
 type DecayEvent struct {
-	TimeStamp int64
-	Value     float64
+	TimeStamp int64   `json:"ts"`
+	Value     float64 `json:"value"`
 }
 
 const (

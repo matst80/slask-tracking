@@ -5,11 +5,12 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/matst80/slask-tracking/pkg/view"
 )
 
-func TrackHandler(trk view.TrackingHandler, handler func(w http.ResponseWriter, r *http.Request, sessionId int, trackingHandler view.TrackingHandler) error) http.HandlerFunc {
+func TrackHandler(trk view.TrackingHandler, handler func(r *http.Request, sessionId int, trackingHandler view.TrackingHandler) error) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "OPTIONS" {
 			w.Header().Set("Cache-Control", "public, max-age=3600")
@@ -29,7 +30,7 @@ func TrackHandler(trk view.TrackingHandler, handler func(w http.ResponseWriter, 
 				return
 			}
 			sessionId := HandleSessionCookie(trk, w, r)
-			err := handler(w, r, sessionId, trk)
+			err := handler(r, sessionId, trk)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
@@ -39,7 +40,7 @@ func TrackHandler(trk view.TrackingHandler, handler func(w http.ResponseWriter, 
 	}
 }
 
-func TrackClick(w http.ResponseWriter, r *http.Request, sessionId int, trk view.TrackingHandler) error {
+func TrackClick(r *http.Request, sessionId int, trk view.TrackingHandler) error {
 	id := r.URL.Query().Get("id")
 	itemId, err := strconv.Atoi(id)
 	pos := r.URL.Query().Get("pos")
@@ -49,14 +50,14 @@ func TrackClick(w http.ResponseWriter, r *http.Request, sessionId int, trk view.
 	}
 
 	go trk.HandleEvent(view.Event{
-		BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_CLICK, SessionId: sessionId},
+		BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_CLICK, SessionId: sessionId, TimeStamp: time.Now().Unix()},
 		Item:      uint(itemId),
 		Position:  float32(position) / 100.0,
 	})
 	return nil
 }
 
-func TrackImpression(w http.ResponseWriter, r *http.Request, sessionId int, trk view.TrackingHandler) error {
+func TrackImpression(r *http.Request, sessionId int, trk view.TrackingHandler) error {
 
 	data := make([]view.Impression, 0)
 	err := json.NewDecoder(r.Body).Decode(&data)
@@ -64,7 +65,7 @@ func TrackImpression(w http.ResponseWriter, r *http.Request, sessionId int, trk 
 		return err
 	}
 	go trk.HandleImpressionEvent(view.ImpressionEvent{
-		BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_IMPRESS, SessionId: sessionId},
+		BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_IMPRESS, SessionId: sessionId, TimeStamp: time.Now().Unix()},
 		Items:     data,
 	})
 
@@ -77,7 +78,7 @@ type ActionData struct {
 	Reason string `json:"reason"`
 }
 
-func TrackAction(w http.ResponseWriter, r *http.Request, sessionId int, trk view.TrackingHandler) error {
+func TrackAction(r *http.Request, sessionId int, trk view.TrackingHandler) error {
 
 	var data ActionData
 	err := json.NewDecoder(r.Body).Decode(&data)
@@ -85,7 +86,7 @@ func TrackAction(w http.ResponseWriter, r *http.Request, sessionId int, trk view
 		return err
 	}
 	go trk.HandleActionEvent(view.ActionEvent{
-		BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_ACTION, SessionId: sessionId},
+		BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_ACTION, SessionId: sessionId, TimeStamp: time.Now().Unix()},
 		Item:      data.Item,
 		Action:    data.Action,
 		Reason:    data.Reason,
@@ -99,7 +100,7 @@ type CartData struct {
 	Quantity uint `json:"quantity"`
 }
 
-func TrackCart(w http.ResponseWriter, r *http.Request, sessionId int, trk view.TrackingHandler) error {
+func TrackCart(r *http.Request, sessionId int, trk view.TrackingHandler) error {
 
 	var data CartData
 	err := json.NewDecoder(r.Body).Decode(&data)
@@ -107,7 +108,7 @@ func TrackCart(w http.ResponseWriter, r *http.Request, sessionId int, trk view.T
 		return err
 	}
 	go trk.HandleCartEvent(view.CartEvent{
-		BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_ACTION, SessionId: sessionId},
+		BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_ACTION, SessionId: sessionId, TimeStamp: time.Now().Unix()},
 		Item:      data.Item,
 		Quantity:  data.Quantity,
 	})

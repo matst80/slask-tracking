@@ -18,8 +18,8 @@ const (
 )
 
 type BaseEvent struct {
-	TimeStamp int64  `json:"ts"`
-	SessionId int    `json:"session_id"`
+	TimeStamp int64  `json:"ts,omitempty"`
+	SessionId int    `json:"session_id,omitempty"`
 	Event     uint16 `json:"event"`
 }
 
@@ -60,8 +60,8 @@ type PurchaseEvent struct {
 type SearchEventData struct {
 	*BaseEvent
 	*index.Filters
-	Query string `json:"query"`
-	Page  int    `json:"page"`
+	Query string `json:"query,omitempty"`
+	Page  int    `json:"page,omitempty"`
 }
 
 type PopularityListener interface {
