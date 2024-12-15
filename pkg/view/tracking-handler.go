@@ -515,10 +515,12 @@ func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessi
 			log.Printf("Syncing session %d", sessionId)
 			session.LastSync = ts
 			if facetsChanged {
+				log.Printf("Decaying field events %d", len(session.FieldEvents))
 				facetOverride := session.FieldEvents.Decay(now)
 				s.trackingHandler.SessionFieldPopularityChanged(sessionId, &facetOverride)
 			}
 			if itemsChanged {
+				log.Printf("Decaying item events %d", len(session.ItemEvents))
 				itemOverride := session.ItemEvents.Decay(now)
 				s.trackingHandler.SessionPopularityChanged(sessionId, &itemOverride)
 			}
