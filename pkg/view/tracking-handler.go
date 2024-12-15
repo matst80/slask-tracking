@@ -455,6 +455,7 @@ func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessi
 		session.Events = append(session.Events, event)
 		now := time.Now().Unix() / 60
 		needsSync = now-session.LastSync > 0
+		log.Printf("last sync %d now %d diff %d", session.LastSync, now, now-session.LastSync)
 		session.LastUpdate = now
 		switch e := event.(type) {
 		case Event:
