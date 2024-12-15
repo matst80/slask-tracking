@@ -86,7 +86,7 @@ func (d DecayList) Decay(now int64) index.SortOverride {
 		}
 		result[itemId] = popularity
 		slices.DeleteFunc(events, func(i DecayEvent) bool {
-			return i.Value < 1
+			return i.TimeStamp == 0 || i.Value < 1
 		})
 	}
 	return result
