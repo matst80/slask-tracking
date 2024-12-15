@@ -131,6 +131,10 @@ type SessionData struct {
 	LastSync        int64              `json:"last_sync"`
 }
 
+const (
+	eventLimit = 500
+)
+
 func (session *SessionData) HandleEvent(event interface{}) {
 	if session.ItemEvents == nil {
 		session.ItemEvents = make(map[uint][]DecayEvent)
@@ -138,7 +142,8 @@ func (session *SessionData) HandleEvent(event interface{}) {
 	if session.FieldEvents == nil {
 		session.FieldEvents = make(map[uint][]DecayEvent)
 	}
-	session.Events = append(session.Events, event)
+	start := max(0, len(session.Events)-eventLimit)
+	session.Events = append(session.Events[start:], event)
 	ts := time.Now().Unix()
 	now := ts / 60
 
@@ -313,8 +318,6 @@ func (s *PersistentMemoryTrackingHandler) cleanSessions() {
 		for key, item := range s.Sessions {
 			if limit > item.LastUpdate {
 				delete(s.Sessions, key)
-			} else {
-				item.Events = item.Events[max(0, len(item.Events)-50):]
 			}
 		}
 	}
