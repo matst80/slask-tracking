@@ -131,8 +131,8 @@ var (
 	})
 )
 
-func (m *PersistentMemoryTrackingHandler) ConnectPopularityListener(handler PopularityListener) {
-	m.trackingHandler = handler
+func (s *PersistentMemoryTrackingHandler) ConnectPopularityListener(handler PopularityListener) {
+	s.trackingHandler = handler
 }
 
 func MakeMemoryTrackingHandler(path string, itemsToKeep int) *PersistentMemoryTrackingHandler {
@@ -190,20 +190,22 @@ func (s *PersistentMemoryTrackingHandler) Save() {
 }
 
 func (s *PersistentMemoryTrackingHandler) DecayEvents() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+
 	now := time.Now().Unix()
 	log.Printf("Decaying events %d", len(s.ItemEvents))
 
 	itemOverride := index.SortOverride{}
 	fieldOverride := index.SortOverride{}
 	var popularity float64
+	s.mu.RLock()
 	for itemId, events := range s.ItemEvents {
 		popularity = 0
 		for _, event := range events {
 			popularity += event.Decay(now)
 		}
-		itemOverride[itemId] = popularity
+		if popularity > 0.9 {
+			itemOverride[itemId] = popularity
+		}
 		slices.DeleteFunc(events, func(i DecayEvent) bool {
 			return i.Value < 1
 		})
@@ -213,14 +215,22 @@ func (s *PersistentMemoryTrackingHandler) DecayEvents() {
 		for _, event := range events {
 			popularity += event.Decay(now)
 		}
-		fieldOverride[fieldId] = popularity
+		if popularity > 0.9 {
+			fieldOverride[fieldId] = popularity
+		}
 		slices.DeleteFunc(events, func(i DecayEvent) bool {
 			return i.Value < 1
 		})
 	}
+	s.mu.RUnlock()
+	s.mu.Lock()
+	s.ItemPopularity = itemOverride
+	s.FieldPopularity = fieldOverride
+	s.mu.Unlock()
+	log.Printf("Decayed events %d", len(s.ItemEvents)+len(s.FieldEvents))
 }
 
-func (s PersistentMemoryTrackingHandler) cleanSessions() {
+func (s *PersistentMemoryTrackingHandler) cleanSessions() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if len(s.Sessions) > 500 {
@@ -290,30 +300,30 @@ func (s *PersistentMemoryTrackingHandler) writeFile(path string) error {
 	return err
 }
 
-func (m *PersistentMemoryTrackingHandler) GetItemPopularity() map[uint]float64 {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.ItemPopularity
+func (s *PersistentMemoryTrackingHandler) GetItemPopularity() map[uint]float64 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.ItemPopularity
 }
 
-func (m *PersistentMemoryTrackingHandler) GetUpdatedItems() []interface{} {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.UpdatedItems
+func (s *PersistentMemoryTrackingHandler) GetUpdatedItems() []interface{} {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.UpdatedItems
 }
 
-func (m *PersistentMemoryTrackingHandler) GetQueries() map[string]uint {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.Queries
+func (s *PersistentMemoryTrackingHandler) GetQueries() map[string]uint {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.Queries
 }
 
-func (m *PersistentMemoryTrackingHandler) GetSessions() []*SessionData {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	sessions := make([]*SessionData, len(m.Sessions))
+func (s *PersistentMemoryTrackingHandler) GetSessions() []*SessionData {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	sessions := make([]*SessionData, len(s.Sessions))
 	i := 0
-	for _, session := range m.Sessions {
+	for _, session := range s.Sessions {
 		if len(session.Events) > 1 {
 			sessions[i] = session
 			i++
@@ -322,41 +332,41 @@ func (m *PersistentMemoryTrackingHandler) GetSessions() []*SessionData {
 	return sessions[:i]
 }
 
-func (m *PersistentMemoryTrackingHandler) HandleUpdate(item []interface{}) {
+func (s *PersistentMemoryTrackingHandler) HandleUpdate(item []interface{}) {
 	// log.Printf("Session new session event %d", event.SessionId)
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.changes++
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.changes++
 	updatedProcessed.Inc()
-	m.UpdatedItems = append(m.UpdatedItems, item...)
+	s.UpdatedItems = append(s.UpdatedItems, item...)
 	updatedItemsProcessed.Add(float64(len(item)))
-	diff := len(m.UpdatedItems) - m.updatesToKeep
+	diff := len(s.UpdatedItems) - s.updatesToKeep
 	if diff > 0 {
-		m.UpdatedItems = m.UpdatedItems[len(m.UpdatedItems)-diff:]
+		s.UpdatedItems = s.UpdatedItems[len(s.UpdatedItems)-diff:]
 	}
 }
 
-func (m *PersistentMemoryTrackingHandler) HandlePriceUpdate(item []index.DataItem) {
+func (s *PersistentMemoryTrackingHandler) HandlePriceUpdate(item []index.DataItem) {
 	for _, item := range item {
 		log.Printf("Price update %d, url: %s", item.Id, "https://www.elgiganten.se"+item.Url)
 	}
 }
 
-func (m *PersistentMemoryTrackingHandler) GetFieldPopularity() index.SortOverride {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.FieldPopularity
+func (s *PersistentMemoryTrackingHandler) GetFieldPopularity() index.SortOverride {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.FieldPopularity
 }
 
-func (m *PersistentMemoryTrackingHandler) HandleSessionEvent(event Session) {
+func (s *PersistentMemoryTrackingHandler) HandleSessionEvent(event Session) {
 	// log.Printf("Session new session event %d", event.SessionId)
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.changes++
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.changes++
 	opsProcessed.Inc()
 
 	events := make([]interface{}, 0, 200)
-	m.Sessions[event.SessionId] = &SessionData{
+	s.Sessions[event.SessionId] = &SessionData{
 		SessionContent: &event.SessionContent,
 		Created:        time.Now().Unix(),
 		LastUpdate:     time.Now().Unix(),
@@ -366,71 +376,71 @@ func (m *PersistentMemoryTrackingHandler) HandleSessionEvent(event Session) {
 	}
 }
 
-func (m *PersistentMemoryTrackingHandler) appendItemEvent(itemId uint, value float64) {
-	if m.ItemEvents == nil {
-		m.ItemEvents = make(map[uint][]DecayEvent)
+func (s *PersistentMemoryTrackingHandler) appendItemEvent(itemId uint, value float64) {
+	if s.ItemEvents == nil {
+		s.ItemEvents = make(map[uint][]DecayEvent)
 	}
-	m.ItemEvents.Add(itemId, DecayEvent{
+	s.ItemEvents.Add(itemId, DecayEvent{
 		TimeStamp: time.Now().Unix(),
 		Value:     value,
 	})
 }
 
-func (m *PersistentMemoryTrackingHandler) appendFieldEvent(fieldId uint, value float64) {
-	if m.FieldEvents == nil {
-		m.FieldEvents = make(map[uint][]DecayEvent)
+func (s *PersistentMemoryTrackingHandler) appendFieldEvent(fieldId uint, value float64) {
+	if s.FieldEvents == nil {
+		s.FieldEvents = make(map[uint][]DecayEvent)
 	}
-	m.FieldEvents.Add(fieldId, DecayEvent{
+	s.FieldEvents.Add(fieldId, DecayEvent{
 		TimeStamp: time.Now().Unix(),
 		Value:     value,
 	})
 
 }
 
-func (m *PersistentMemoryTrackingHandler) HandleEvent(event Event) {
+func (s *PersistentMemoryTrackingHandler) HandleEvent(event Event) {
 	// log.Printf("Event SessionId: %d, ItemId: %d, Position: %f", event.SessionId, event.Item, event.Position)
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.appendItemEvent(event.Item, 100)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.appendItemEvent(event.Item, 100)
 
-	m.updateSession(event, event.SessionId)
+	s.updateSession(event, event.SessionId)
 
-	m.changes++
+	s.changes++
 	go opsProcessed.Inc()
 }
 
-func (m *PersistentMemoryTrackingHandler) HandleCartEvent(event CartEvent) {
+func (s *PersistentMemoryTrackingHandler) HandleCartEvent(event CartEvent) {
 	// log.Printf("Cart event SessionId: %d, ItemId: %d, Quantity: %d", event.SessionId, event.Item, event.Quantity)
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.appendItemEvent(event.Item, 500)
-	m.changes++
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.appendItemEvent(event.Item, 500)
+	s.changes++
 	go opsProcessed.Inc()
-	m.updateSession(event, event.SessionId)
+	s.updateSession(event, event.SessionId)
 }
 
-func (m *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventData) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.changes++
+func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventData) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.changes++
 	go opsProcessed.Inc()
 	if event.Query != "" {
-		m.Queries[event.Query] += 1
+		s.Queries[event.Query] += 1
 	}
 
 	for _, filter := range event.Filters.StringFilter {
-		m.appendFieldEvent(filter.Id, 10)
+		s.appendFieldEvent(filter.Id, 10)
 	}
 	for _, filter := range event.Filters.RangeFilter {
-		m.appendFieldEvent(filter.Id, 10)
+		s.appendFieldEvent(filter.Id, 10)
 	}
-	m.updateSession(event, event.SessionId)
+	s.updateSession(event, event.SessionId)
 
 }
 
-func (m *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessionId int) {
+func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessionId int) {
 
-	session, ok := m.Sessions[sessionId]
+	session, ok := s.Sessions[sessionId]
 	needsSync := false
 	facetsChanged := false
 	itemsChanged := false
@@ -497,35 +507,35 @@ func (m *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessi
 				itemsChanged = true
 			}
 		}
-		if m.trackingHandler != nil && needsSync {
+		if s.trackingHandler != nil && needsSync {
 			if facetsChanged {
 				facetOverride := session.FieldEvents.Decay(now)
-				m.trackingHandler.SessionFieldPopularityChanged(sessionId, &facetOverride)
+				s.trackingHandler.SessionFieldPopularityChanged(sessionId, &facetOverride)
 			}
 			if itemsChanged {
 				itemOverride := session.ItemEvents.Decay(now)
-				m.trackingHandler.SessionPopularityChanged(sessionId, &itemOverride)
+				s.trackingHandler.SessionPopularityChanged(sessionId, &itemOverride)
 			}
 		}
 	}
 }
 
-func (m *PersistentMemoryTrackingHandler) HandleImpressionEvent(event ImpressionEvent) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+func (s *PersistentMemoryTrackingHandler) HandleImpressionEvent(event ImpressionEvent) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	go opsProcessed.Inc()
 	for _, impression := range event.Items {
-		m.ItemPopularity[impression.Id] += 0.01 + float64(impression.Position)/1000
+		s.ItemPopularity[impression.Id] += 0.01 + float64(impression.Position)/1000
 	}
-	m.updateSession(event, event.SessionId)
-	m.changes++
+	s.updateSession(event, event.SessionId)
+	s.changes++
 
 }
 
-func (m *PersistentMemoryTrackingHandler) HandleActionEvent(event ActionEvent) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+func (s *PersistentMemoryTrackingHandler) HandleActionEvent(event ActionEvent) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	go opsProcessed.Inc()
-	m.updateSession(event, event.SessionId)
-	m.changes++
+	s.updateSession(event, event.SessionId)
+	s.changes++
 }
