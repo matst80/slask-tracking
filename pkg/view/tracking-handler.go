@@ -70,10 +70,14 @@ func (d *DecayEvent) Decay(now int64) float64 {
 type DecayList map[uint][]DecayEvent
 
 func (d *DecayList) Add(key uint, value DecayEvent) {
-	if _, ok := (*d)[key]; !ok {
-		(*d)[key] = make([]DecayEvent, 0)
+	f, ok := (*d)[key]
+	if !ok {
+		(*d)[key] = []DecayEvent{
+			value,
+		}
+	} else {
+		f = append(f, value)
 	}
-	(*d)[key] = append((*d)[key], value)
 }
 
 func (d *DecayList) Decay(now int64) index.SortOverride {
@@ -87,9 +91,14 @@ func (d *DecayList) Decay(now int64) index.SortOverride {
 		if popularity > 0.5 {
 			result[itemId] = popularity
 		}
-		(*d)[itemId] = slices.DeleteFunc(events, func(i DecayEvent) bool {
+		r := slices.DeleteFunc(events, func(i DecayEvent) bool {
 			return i.TimeStamp == 0 || i.Value < 1
 		})
+		if len(r) < 0 {
+			delete(*d, itemId)
+		} else {
+			(*d)[itemId] = r
+		}
 	}
 	return result
 }
@@ -300,7 +309,7 @@ func (s *PersistentMemoryTrackingHandler) cleanSessions() {
 		tm := time.Now()
 		limit := tm.Unix() - 60*60*24*7
 		for key, item := range s.Sessions {
-			if len(item.Events) < 10 || limit > item.LastUpdate {
+			if limit > item.LastUpdate {
 				delete(s.Sessions, key)
 			} else {
 				item.Events = item.Events[max(0, len(item.Events)-50):]
@@ -311,7 +320,10 @@ func (s *PersistentMemoryTrackingHandler) cleanSessions() {
 
 func (s *PersistentMemoryTrackingHandler) DecaySessionEvents() {
 	if s.trackingHandler != nil {
-		for _, session := range s.Sessions {
+		for id, session := range s.Sessions {
+			if session.Id != id {
+				session.Id = id
+			}
 			session.DecayEvents(s.trackingHandler)
 		}
 	}
