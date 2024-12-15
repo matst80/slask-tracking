@@ -203,16 +203,18 @@ func (session *SessionData) DecayEvents(trk PopularityListener) {
 
 	log.Printf("Decaying field events %d", len(session.FieldEvents))
 	session.FieldPopularity = session.FieldEvents.Decay(now)
-	err := trk.SessionFieldPopularityChanged(session.Id, &session.FieldPopularity)
-	if err != nil {
-		log.Println(err)
+	if len(session.FieldPopularity) > 0 {
+		if err := trk.SessionFieldPopularityChanged(session.Id, &session.FieldPopularity); err != nil {
+			log.Println(err)
+		}
 	}
 
 	log.Printf("Decaying item events %d", len(session.ItemEvents))
 	session.ItemPopularity = session.ItemEvents.Decay(now)
-	err = trk.SessionPopularityChanged(session.Id, &session.ItemPopularity)
-	if err != nil {
-		log.Println(err)
+	if len(session.ItemPopularity) > 0 {
+		if err := trk.SessionPopularityChanged(session.Id, &session.ItemPopularity); err != nil {
+			log.Println(err)
+		}
 	}
 }
 
