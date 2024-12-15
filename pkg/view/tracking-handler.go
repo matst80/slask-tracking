@@ -87,7 +87,7 @@ func (d *DecayList) Decay(now int64) index.SortOverride {
 		if popularity > 0.5 {
 			result[itemId] = popularity
 		}
-		slices.DeleteFunc(events, func(i DecayEvent) bool {
+		(*d)[itemId] = slices.DeleteFunc(events, func(i DecayEvent) bool {
 			return i.TimeStamp == 0 || i.Value < 1
 		})
 	}
@@ -281,43 +281,14 @@ func (s *PersistentMemoryTrackingHandler) Save() {
 }
 
 func (s *PersistentMemoryTrackingHandler) DecayEvents() {
-
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	now := time.Now().Unix()
 	log.Printf("Decaying events %d", len(s.ItemEvents))
 
-	itemOverride := index.SortOverride{}
-	fieldOverride := index.SortOverride{}
-	var popularity float64
-	s.mu.RLock()
-	for itemId, events := range s.ItemEvents {
-		popularity = 0
-		for _, event := range events {
-			popularity += event.Decay(now)
-		}
-		if popularity > 0.9 {
-			itemOverride[itemId] = popularity
-		}
-		slices.DeleteFunc(events, func(i DecayEvent) bool {
-			return i.Value < 1
-		})
-	}
-	for fieldId, events := range s.FieldEvents {
-		popularity = 0
-		for _, event := range events {
-			popularity += event.Decay(now)
-		}
-		if popularity > 0.9 {
-			fieldOverride[fieldId] = popularity
-		}
-		slices.DeleteFunc(events, func(i DecayEvent) bool {
-			return i.Value < 1
-		})
-	}
-	s.mu.RUnlock()
-	s.mu.Lock()
-	s.ItemPopularity = itemOverride
-	s.FieldPopularity = fieldOverride
-	s.mu.Unlock()
+	s.ItemPopularity = s.ItemEvents.Decay(now)
+	s.FieldPopularity = s.FieldEvents.Decay(now)
+
 	log.Printf("Decayed events %d", len(s.ItemEvents)+len(s.FieldEvents))
 }
 
