@@ -111,12 +111,100 @@ type PersistentMemoryTrackingHandler struct {
 
 type SessionData struct {
 	*SessionContent
-	Events      []interface{} `json:"events"`
-	ItemEvents  DecayList     `json:"item_events"`
-	FieldEvents DecayList     `json:"field_events"`
-	Created     int64         `json:"ts"`
-	LastUpdate  int64         `json:"last_update"`
-	LastSync    int64         `json:"last_sync"`
+	ItemPopularity  index.SortOverride `json:"item_popularity"`
+	FieldPopularity index.SortOverride `json:"field_popularity"`
+	Id              int                `json:"id"`
+	Events          []interface{}      `json:"events"`
+	ItemEvents      DecayList          `json:"item_events"`
+	FieldEvents     DecayList          `json:"field_events"`
+	Created         int64              `json:"ts"`
+	LastUpdate      int64              `json:"last_update"`
+	LastSync        int64              `json:"last_sync"`
+}
+
+func (session *SessionData) HandleEvent(event interface{}) {
+	if session.ItemEvents == nil {
+		session.ItemEvents = make(map[uint][]DecayEvent)
+	}
+	if session.FieldEvents == nil {
+		session.FieldEvents = make(map[uint][]DecayEvent)
+	}
+	session.Events = append(session.Events, event)
+	ts := time.Now().Unix()
+	now := ts / 60
+
+	session.LastUpdate = now
+	switch e := event.(type) {
+	case Event:
+		session.ItemEvents.Add(e.Item, DecayEvent{
+			TimeStamp: now,
+			Value:     509,
+		})
+
+	case SearchEventData:
+		for _, filter := range e.Filters.StringFilter {
+			session.FieldEvents.Add(filter.Id, DecayEvent{
+				TimeStamp: now,
+				Value:     15,
+			})
+
+		}
+		for _, filter := range e.Filters.RangeFilter {
+			session.FieldEvents.Add(filter.Id, DecayEvent{
+				TimeStamp: now,
+				Value:     10,
+			})
+
+		}
+	case ImpressionEvent:
+		for _, impression := range e.Items {
+			session.ItemEvents.Add(impression.Id, DecayEvent{
+				TimeStamp: now,
+				Value:     0.5 * float64(impression.Position),
+			})
+		}
+
+	case CartEvent:
+		session.ItemEvents.Add(e.Item, DecayEvent{
+			TimeStamp: now,
+			Value:     700,
+		})
+
+	case ActionEvent:
+		session.ItemEvents.Add(e.Item, DecayEvent{
+			TimeStamp: now,
+			Value:     80,
+		})
+
+	case PurchaseEvent:
+		for _, purchase := range e.Items {
+			session.ItemEvents.Add(purchase.Id, DecayEvent{
+				TimeStamp: now,
+				Value:     800 * float64(purchase.Quantity),
+			})
+
+		}
+	}
+}
+
+func (session *SessionData) DecayEvents(trk PopularityListener) {
+	ts := time.Now().Unix()
+	now := ts / 60
+	session.LastSync = ts
+
+	log.Printf("Decaying field events %d", len(session.FieldEvents))
+	session.FieldPopularity = session.FieldEvents.Decay(now)
+	err := trk.SessionFieldPopularityChanged(session.Id, &session.FieldPopularity)
+	if err != nil {
+		log.Println(err)
+	}
+
+	log.Printf("Decaying item events %d", len(session.ItemEvents))
+	session.ItemPopularity = session.ItemEvents.Decay(now)
+	err = trk.SessionPopularityChanged(session.Id, &session.ItemPopularity)
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 var (
@@ -250,8 +338,17 @@ func (s *PersistentMemoryTrackingHandler) cleanSessions() {
 	}
 }
 
+func (s *PersistentMemoryTrackingHandler) DecaySessionEvents() {
+	if s.trackingHandler != nil {
+		for _, session := range s.Sessions {
+			session.DecayEvents(s.trackingHandler)
+		}
+	}
+}
+
 func (s *PersistentMemoryTrackingHandler) save() error {
 	s.DecayEvents()
+	s.DecaySessionEvents()
 	s.cleanSessions()
 	defer runtime.GC()
 	if s.changes == 0 {
@@ -444,88 +541,22 @@ func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventDat
 func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessionId int) {
 
 	session, ok := s.Sessions[sessionId]
-	needsSync := false
-	facetsChanged := false
-	itemsChanged := false
-	if ok {
-		if session.ItemEvents == nil {
-			session.ItemEvents = make(map[uint][]DecayEvent)
+	if !ok {
+		session = &SessionData{
+			SessionContent: &SessionContent{},
+			Created:        time.Now().Unix(),
+			LastUpdate:     time.Now().Unix(),
+			LastSync:       0,
+			Id:             sessionId,
+			Events:         make([]interface{}, 0),
+			ItemEvents:     make(map[uint][]DecayEvent),
+			FieldEvents:    make(map[uint][]DecayEvent),
 		}
-		if session.FieldEvents == nil {
-			session.FieldEvents = make(map[uint][]DecayEvent)
-		}
-		session.Events = append(session.Events, event)
-		ts := time.Now().Unix()
-		now := ts / 60
-		needsSync = ts-session.LastSync > 30
-		session.LastUpdate = now
-		switch e := event.(type) {
-		case Event:
-			session.ItemEvents.Add(e.Item, DecayEvent{
-				TimeStamp: now,
-				Value:     509,
-			})
-
-			itemsChanged = true
-		case SearchEventData:
-			for _, filter := range e.Filters.StringFilter {
-				session.FieldEvents.Add(filter.Id, DecayEvent{
-					TimeStamp: now,
-					Value:     15,
-				})
-				facetsChanged = true
-			}
-			for _, filter := range e.Filters.RangeFilter {
-				session.FieldEvents.Add(filter.Id, DecayEvent{
-					TimeStamp: now,
-					Value:     10,
-				})
-				facetsChanged = true
-			}
-		case ImpressionEvent:
-			for _, impression := range e.Items {
-				session.ItemEvents.Add(impression.Id, DecayEvent{
-					TimeStamp: now,
-					Value:     0.5 * float64(impression.Position),
-				})
-			}
-			itemsChanged = true
-		case CartEvent:
-			session.ItemEvents.Add(e.Item, DecayEvent{
-				TimeStamp: now,
-				Value:     700,
-			})
-			itemsChanged = true
-		case ActionEvent:
-			session.ItemEvents.Add(e.Item, DecayEvent{
-				TimeStamp: now,
-				Value:     80,
-			})
-			itemsChanged = true
-		case PurchaseEvent:
-			for _, purchase := range e.Items {
-				session.ItemEvents.Add(purchase.Id, DecayEvent{
-					TimeStamp: now,
-					Value:     800 * float64(purchase.Quantity),
-				})
-				itemsChanged = true
-			}
-		}
-		if s.trackingHandler != nil && needsSync {
-			log.Printf("Syncing session %d", sessionId)
-			session.LastSync = ts
-			if facetsChanged {
-				log.Printf("Decaying field events %d", len(session.FieldEvents))
-				facetOverride := session.FieldEvents.Decay(now)
-				s.trackingHandler.SessionFieldPopularityChanged(sessionId, &facetOverride)
-			}
-			if itemsChanged {
-				log.Printf("Decaying item events %d", len(session.ItemEvents))
-				itemOverride := session.ItemEvents.Decay(now)
-				s.trackingHandler.SessionPopularityChanged(sessionId, &itemOverride)
-			}
-		}
+		s.Sessions[sessionId] = session
 	}
+
+	session.HandleEvent(event)
+
 }
 
 func (s *PersistentMemoryTrackingHandler) HandleImpressionEvent(event ImpressionEvent) {
