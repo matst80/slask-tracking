@@ -114,6 +114,7 @@ type SessionData struct {
 	FieldEvents DecayList     `json:"field_events"`
 	Created     int64         `json:"ts"`
 	LastUpdate  int64         `json:"last_update"`
+	LastSync    int64         `json:"last_sync"`
 }
 
 var (
@@ -453,7 +454,7 @@ func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessi
 		}
 		session.Events = append(session.Events, event)
 		now := time.Now().Unix() / 60
-		needsSync = now-session.LastUpdate > 0
+		needsSync = now-session.LastSync > 0
 		session.LastUpdate = now
 		switch e := event.(type) {
 		case Event:
@@ -508,6 +509,7 @@ func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessi
 			}
 		}
 		if s.trackingHandler != nil && needsSync {
+			session.LastSync = now
 			if facetsChanged {
 				facetOverride := session.FieldEvents.Decay(now)
 				s.trackingHandler.SessionFieldPopularityChanged(sessionId, &facetOverride)
