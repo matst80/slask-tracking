@@ -84,7 +84,9 @@ func (d *DecayList) Decay(now int64) index.SortOverride {
 		for _, event := range events {
 			popularity += event.Decay(now)
 		}
-		result[itemId] = popularity
+		if popularity > 0.5 {
+			result[itemId] = popularity
+		}
 		slices.DeleteFunc(events, func(i DecayEvent) bool {
 			return i.TimeStamp == 0 || i.Value < 1
 		})
@@ -453,9 +455,9 @@ func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessi
 			session.FieldEvents = make(map[uint][]DecayEvent)
 		}
 		session.Events = append(session.Events, event)
-		now := time.Now().Unix() / 60
-		needsSync = now-session.LastSync > 0
-		log.Printf("last sync %d now %d diff %d", session.LastSync, now, now-session.LastSync)
+		ts := time.Now().Unix()
+		now := ts / 60
+		needsSync = ts-session.LastSync > 30
 		session.LastUpdate = now
 		switch e := event.(type) {
 		case Event:
@@ -510,7 +512,8 @@ func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessi
 			}
 		}
 		if s.trackingHandler != nil && needsSync {
-			session.LastSync = now
+			log.Printf("Syncing session %d", sessionId)
+			session.LastSync = ts
 			if facetsChanged {
 				facetOverride := session.FieldEvents.Decay(now)
 				s.trackingHandler.SessionFieldPopularityChanged(sessionId, &facetOverride)
