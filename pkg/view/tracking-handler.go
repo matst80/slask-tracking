@@ -154,14 +154,14 @@ func (session *SessionData) HandleEvent(event interface{}) {
 		for _, filter := range e.Filters.StringFilter {
 			session.FieldEvents.Add(filter.Id, DecayEvent{
 				TimeStamp: now,
-				Value:     15,
+				Value:     150,
 			})
 
 		}
 		for _, filter := range e.Filters.RangeFilter {
 			session.FieldEvents.Add(filter.Id, DecayEvent{
 				TimeStamp: now,
-				Value:     10,
+				Value:     100,
 			})
 
 		}
@@ -461,32 +461,35 @@ func (s *PersistentMemoryTrackingHandler) HandleSessionEvent(event Session) {
 	}
 }
 
-func (s *PersistentMemoryTrackingHandler) appendItemEvent(itemId uint, value float64) {
-	if s.ItemEvents == nil {
-		s.ItemEvents = make(map[uint][]DecayEvent)
-	}
-	s.ItemEvents.Add(itemId, DecayEvent{
-		TimeStamp: time.Now().Unix(),
-		Value:     value,
-	})
-}
-
-func (s *PersistentMemoryTrackingHandler) appendFieldEvent(fieldId uint, value float64) {
-	if s.FieldEvents == nil {
-		s.FieldEvents = make(map[uint][]DecayEvent)
-	}
-	s.FieldEvents.Add(fieldId, DecayEvent{
-		TimeStamp: time.Now().Unix(),
-		Value:     value,
-	})
-
-}
+//func (s *PersistentMemoryTrackingHandler) appendItemEvent(itemId uint, value float64) {
+//	if s.ItemEvents == nil {
+//		s.ItemEvents = make(map[uint][]DecayEvent)
+//	}
+//	s.ItemEvents.Add(itemId, DecayEvent{
+//		TimeStamp: time.Now().Unix(),
+//		Value:     value,
+//	})
+//}
+//
+//func (s *PersistentMemoryTrackingHandler) appendFieldEvent(fieldId uint, value float64) {
+//	if s.FieldEvents == nil {
+//		s.FieldEvents = make(map[uint][]DecayEvent)
+//	}
+//	s.FieldEvents.Add(fieldId, DecayEvent{
+//		TimeStamp: time.Now().Unix(),
+//		Value:     value,
+//	})
+//
+//}
 
 func (s *PersistentMemoryTrackingHandler) HandleEvent(event Event) {
 	// log.Printf("Event SessionId: %d, ItemId: %d, Position: %f", event.SessionId, event.Item, event.Position)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.appendItemEvent(event.Item, 100)
+	s.ItemEvents.Add(event.Item, DecayEvent{
+		TimeStamp: time.Now().Unix(),
+		Value:     40,
+	})
 
 	s.updateSession(event, event.SessionId)
 
@@ -498,7 +501,10 @@ func (s *PersistentMemoryTrackingHandler) HandleCartEvent(event CartEvent) {
 	// log.Printf("Cart event SessionId: %d, ItemId: %d, Quantity: %d", event.SessionId, event.Item, event.Quantity)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.appendItemEvent(event.Item, 500)
+	s.ItemEvents.Add(event.Item, DecayEvent{
+		TimeStamp: time.Now().Unix(),
+		Value:     140,
+	})
 	s.changes++
 	go opsProcessed.Inc()
 	s.updateSession(event, event.SessionId)
@@ -512,12 +518,18 @@ func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventDat
 	if event.Query != "" {
 		s.Queries[event.Query] += 1
 	}
-
+	ts := time.Now().Unix()
 	for _, filter := range event.Filters.StringFilter {
-		s.appendFieldEvent(filter.Id, 10)
+		s.FieldEvents.Add(filter.Id, DecayEvent{
+			TimeStamp: ts,
+			Value:     6,
+		})
 	}
 	for _, filter := range event.Filters.RangeFilter {
-		s.appendFieldEvent(filter.Id, 10)
+		s.FieldEvents.Add(filter.Id, DecayEvent{
+			TimeStamp: ts,
+			Value:     3,
+		})
 	}
 	s.updateSession(event, event.SessionId)
 
