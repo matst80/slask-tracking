@@ -317,6 +317,7 @@ func (s *PersistentMemoryTrackingHandler) cleanSessions() {
 		limit := tm.Unix() - 60*60*24*7
 		for key, item := range s.Sessions {
 			if limit > item.LastUpdate {
+				log.Printf("Deleting session %d", key)
 				delete(s.Sessions, key)
 			}
 		}
