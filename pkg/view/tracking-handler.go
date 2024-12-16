@@ -311,7 +311,7 @@ func (s *PersistentMemoryTrackingHandler) DecayEvents() {
 func (s *PersistentMemoryTrackingHandler) cleanSessions() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if len(s.Sessions) > 500 {
+	if len(s.Sessions) > 50000 {
 		log.Println("Cleaning sessions")
 		tm := time.Now()
 		limit := tm.Unix() - 60*60*24*7
