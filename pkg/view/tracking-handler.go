@@ -86,20 +86,21 @@ func (d *DecayList) Decay(now int64) index.SortOverride {
 	result := index.SortOverride{}
 	var popularity float64
 	var event DecayEvent
+	toDelete := make([]uint, 0, len(*d))
 	for itemId, events := range *d {
 		popularity = 0
 		for _, event = range events {
 			popularity += event.Decay(now)
 		}
-		if popularity > 0.5 {
+		if popularity > 0.3 {
 			result[itemId] = popularity
+		} else {
+			toDelete = append(toDelete, itemId)
 		}
 
 	}
-	for i, r := range result {
-		if r < 1 {
-			delete(*d, i)
-		}
+	for _, id := range toDelete {
+		delete(*d, id)
 	}
 	return result
 }
@@ -205,10 +206,12 @@ func (session *SessionData) HandleEvent(event interface{}) {
 func (session *SessionData) DecayEvents(trk PopularityListener) {
 	ts := time.Now().Unix()
 	now := ts / 60
+
 	session.LastSync = ts
 
 	log.Printf("Decaying field events %d", len(session.FieldEvents))
 	session.FieldPopularity = session.FieldEvents.Decay(now)
+	log.Printf("Session field popularity %d", len(session.FieldPopularity))
 	if len(session.FieldPopularity) > 0 {
 		if err := trk.SessionFieldPopularityChanged(session.Id, &session.FieldPopularity); err != nil {
 			log.Println(err)
@@ -216,6 +219,7 @@ func (session *SessionData) DecayEvents(trk PopularityListener) {
 	}
 
 	log.Printf("Decaying item events %d", len(session.ItemEvents))
+	log.Printf("Session item popularity %d", len(session.ItemEvents))
 	session.ItemPopularity = session.ItemEvents.Decay(now)
 	if len(session.ItemPopularity) > 0 {
 		if err := trk.SessionPopularityChanged(session.Id, &session.ItemPopularity); err != nil {
