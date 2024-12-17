@@ -6,7 +6,6 @@ import (
 	"math"
 	"os"
 	"runtime"
-	"slices"
 	"sync"
 	"time"
 
@@ -62,9 +61,12 @@ func (d *DecayEvent) CalculateValue(now int64) float64 {
 }
 
 func (d *DecayEvent) Decay(now int64) float64 {
-	d.Value = d.CalculateValue(now)
-	d.TimeStamp = now
-	return d.Value
+	v := d.CalculateValue(now)
+	//if v < 0.1 {
+	//	d.TimeStamp = now
+	//	d.Value = v
+	//}
+	return v
 }
 
 type DecayList map[uint][]DecayEvent
@@ -83,21 +85,20 @@ func (d *DecayList) Add(key uint, value DecayEvent) {
 func (d *DecayList) Decay(now int64) index.SortOverride {
 	result := index.SortOverride{}
 	var popularity float64
+	var event DecayEvent
 	for itemId, events := range *d {
 		popularity = 0
-		for _, event := range events {
+		for _, event = range events {
 			popularity += event.Decay(now)
 		}
 		if popularity > 0.5 {
 			result[itemId] = popularity
 		}
-		r := slices.DeleteFunc(events, func(i DecayEvent) bool {
-			return i.TimeStamp == 0 || i.Value < 1
-		})
-		if len(r) < 0 {
-			delete(*d, itemId)
-		} else {
-			(*d)[itemId] = r
+
+	}
+	for i, r := range result {
+		if r < 1 {
+			delete(*d, i)
 		}
 	}
 	return result
