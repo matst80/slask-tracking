@@ -208,22 +208,26 @@ func (session *SessionData) DecayEvents(trk PopularityListener) {
 	now := ts / 60
 
 	session.LastSync = ts
-
-	log.Printf("Decaying field events %d", len(session.FieldEvents))
-	session.FieldPopularity = session.FieldEvents.Decay(now)
-	log.Printf("Session field popularity %d", len(session.FieldPopularity))
-	if len(session.FieldPopularity) > 0 {
-		if err := trk.SessionFieldPopularityChanged(session.Id, &session.FieldPopularity); err != nil {
-			log.Println(err)
+	sf := len(session.FieldEvents)
+	if sf > 0 {
+		log.Printf("Decaying field events %d", sf)
+		session.FieldPopularity = session.FieldEvents.Decay(now)
+		log.Printf("Session field popularity %d", len(session.FieldPopularity))
+		if len(session.FieldPopularity) > 0 {
+			if err := trk.SessionFieldPopularityChanged(session.Id, &session.FieldPopularity); err != nil {
+				log.Println(err)
+			}
 		}
 	}
 
-	log.Printf("Decaying item events %d", len(session.ItemEvents))
-	log.Printf("Session item popularity %d", len(session.ItemEvents))
-	session.ItemPopularity = session.ItemEvents.Decay(now)
-	if len(session.ItemPopularity) > 0 {
-		if err := trk.SessionPopularityChanged(session.Id, &session.ItemPopularity); err != nil {
-			log.Println(err)
+	si := len(session.ItemEvents)
+	if si > 0 {
+		log.Printf("Decaying item events %d", si)
+		session.ItemPopularity = session.ItemEvents.Decay(now)
+		if len(session.ItemPopularity) > 0 {
+			if err := trk.SessionPopularityChanged(session.Id, &session.ItemPopularity); err != nil {
+				log.Println(err)
+			}
 		}
 	}
 }
@@ -305,12 +309,15 @@ func (s *PersistentMemoryTrackingHandler) DecayEvents() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := time.Now().Unix()
-	log.Printf("Decaying events %d", len(s.ItemEvents))
+	l := len(s.ItemEvents) + len(s.FieldEvents)
+	if l == 0 {
+		return
+	}
 
 	s.ItemPopularity = s.ItemEvents.Decay(now)
 	s.FieldPopularity = s.FieldEvents.Decay(now)
 
-	log.Printf("Decayed events %d", len(s.ItemEvents)+len(s.FieldEvents))
+	log.Printf("Decayed events %d", l)
 }
 
 func (s *PersistentMemoryTrackingHandler) cleanSessions() {
