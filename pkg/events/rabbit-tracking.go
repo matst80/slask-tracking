@@ -3,7 +3,6 @@ package events
 import (
 	"encoding/json"
 	"log"
-	"time"
 
 	"github.com/matst80/slask-finder/pkg/index"
 	"github.com/matst80/slask-tracking/pkg/view"
@@ -122,16 +121,13 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 
 	var event view.BaseEvent
 	for d := range toAdd {
-		log.Printf("Got tracking data %s", string(d.Body))
 
 		if err := json.Unmarshal(d.Body, &event); err == nil {
 			switch event.Event {
 			case 0:
 				var session view.Session
 				if err := json.Unmarshal(d.Body, &session); err == nil {
-					if session.TimeStamp == 0 {
-						session.TimeStamp = time.Now().Unix()
-					}
+					session.SetTimestamp()
 					handler.HandleSessionEvent(session)
 				} else {
 					log.Printf("Failed to unmarshal session message %v", err)
@@ -139,9 +135,7 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 			case 1:
 				var searchEventData view.SearchEventData
 				if err := json.Unmarshal(d.Body, &searchEventData); err == nil {
-					if searchEventData.TimeStamp == 0 {
-						searchEventData.TimeStamp = time.Now().Unix()
-					}
+					searchEventData.SetTimestamp()
 					handler.HandleSearchEvent(searchEventData)
 				} else {
 					log.Printf("Failed to unmarshal search event message %v", err)
@@ -149,6 +143,7 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 			case 2:
 				var event view.Event
 				if err := json.Unmarshal(d.Body, &event); err == nil {
+					event.SetTimestamp()
 					handler.HandleEvent(event)
 				} else {
 					log.Printf("Failed to unmarshal event message %v", err)
@@ -156,9 +151,7 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 			case 3:
 				var cartEvent view.CartEvent
 				if err := json.Unmarshal(d.Body, &cartEvent); err == nil {
-					if cartEvent.TimeStamp == 0 {
-						cartEvent.TimeStamp = time.Now().Unix()
-					}
+					cartEvent.SetTimestamp()
 					handler.HandleCartEvent(cartEvent)
 				} else {
 					log.Printf("Failed to unmarshal cart event message %v", err)
@@ -166,9 +159,7 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 			case 4:
 				var cartEvent view.CartEvent
 				if err := json.Unmarshal(d.Body, &cartEvent); err == nil {
-					if cartEvent.TimeStamp == 0 {
-						cartEvent.TimeStamp = time.Now().Unix()
-					}
+					cartEvent.SetTimestamp()
 					handler.HandleCartEvent(cartEvent)
 				} else {
 					log.Printf("Failed to unmarshal cart event message %v", err)
@@ -176,9 +167,7 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 			case 5:
 				var impressionsEvent view.ImpressionEvent
 				if err := json.Unmarshal(d.Body, &impressionsEvent); err == nil {
-					if impressionsEvent.TimeStamp == 0 {
-						impressionsEvent.TimeStamp = time.Now().Unix()
-					}
+					impressionsEvent.SetTimestamp()
 					handler.HandleImpressionEvent(impressionsEvent)
 				} else {
 					log.Printf("Failed to unmarshal impressions event message %v", err)
@@ -186,9 +175,7 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 			case 6:
 				var actionEvent view.ActionEvent
 				if err := json.Unmarshal(d.Body, &actionEvent); err == nil {
-					if actionEvent.TimeStamp == 0 {
-						actionEvent.TimeStamp = time.Now().Unix()
-					}
+					actionEvent.SetTimestamp()
 					handler.HandleActionEvent(actionEvent)
 				} else {
 					log.Printf("Failed to unmarshal impressions event message %v", err)

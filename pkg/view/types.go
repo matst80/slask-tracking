@@ -1,6 +1,10 @@
 package view
 
-import "github.com/matst80/slask-finder/pkg/index"
+import (
+	"time"
+
+	"github.com/matst80/slask-finder/pkg/index"
+)
 
 const (
 	EVENT_SESSION_START = uint16(0)
@@ -21,6 +25,12 @@ type BaseEvent struct {
 	TimeStamp int64  `json:"ts,omitempty"`
 	SessionId int    `json:"session_id,omitempty"`
 	Event     uint16 `json:"event"`
+}
+
+func (e *BaseEvent) SetTimestamp() {
+	if e.TimeStamp == 0 {
+		e.TimeStamp = time.Now().Unix()
+	}
 }
 
 type SessionContent struct {
