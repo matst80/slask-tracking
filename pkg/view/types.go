@@ -39,12 +39,14 @@ type Event struct {
 	*BaseEvent
 	Item     uint    `json:"item"`
 	Position float32 `json:"position"`
+	Referer  string  `json:"referer,omitempty"`
 }
 
 type CartEvent struct {
 	*BaseEvent
-	Item     uint `json:"item"`
-	Quantity uint `json:"quantity"`
+	Item     uint   `json:"item"`
+	Quantity uint   `json:"quantity"`
+	Referer  string `json:"referer,omitempty"`
 }
 
 type Purchase struct {
@@ -54,14 +56,16 @@ type Purchase struct {
 
 type PurchaseEvent struct {
 	*BaseEvent
-	Items []Purchase `json:"items"`
+	Items   []Purchase `json:"items"`
+	Referer string     `json:"referer,omitempty"`
 }
 
 type SearchEventData struct {
 	*BaseEvent
 	*index.Filters
-	Query string `json:"query,omitempty"`
-	Page  int    `json:"page,omitempty"`
+	Query   string `json:"query,omitempty"`
+	Page    int    `json:"page,omitempty"`
+	Referer string `json:"referer,omitempty"`
 }
 
 type PopularityListener interface {
@@ -83,9 +87,10 @@ type ImpressionEvent struct {
 
 type ActionEvent struct {
 	*BaseEvent
-	Item   uint   `json:"id"`
-	Action string `json:"action"`
-	Reason string `json:"reason"`
+	Item    uint   `json:"id"`
+	Action  string `json:"action"`
+	Reason  string `json:"reason"`
+	Referer string `json:"referer,omitempty"`
 }
 
 func (e *Session) GetType() uint16 {

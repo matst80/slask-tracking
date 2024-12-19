@@ -45,6 +45,7 @@ func TrackClick(r *http.Request, sessionId int, trk view.TrackingHandler) error 
 	itemId, err := strconv.Atoi(id)
 	pos := r.URL.Query().Get("pos")
 	position, _ := strconv.Atoi(pos)
+	referer := r.Header.Get("Referer")
 	if err != nil {
 		return err
 	}
@@ -53,6 +54,7 @@ func TrackClick(r *http.Request, sessionId int, trk view.TrackingHandler) error 
 		BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_CLICK, SessionId: sessionId, TimeStamp: time.Now().Unix()},
 		Item:      uint(itemId),
 		Position:  float32(position) / 100.0,
+		Referer:   referer,
 	})
 	return nil
 }
@@ -85,11 +87,13 @@ func TrackAction(r *http.Request, sessionId int, trk view.TrackingHandler) error
 	if err != nil {
 		return err
 	}
+	referer := r.Header.Get("Referer")
 	go trk.HandleActionEvent(view.ActionEvent{
 		BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_ACTION, SessionId: sessionId, TimeStamp: time.Now().Unix()},
 		Item:      data.Item,
 		Action:    data.Action,
 		Reason:    data.Reason,
+		Referer:   referer,
 	})
 
 	return nil
@@ -107,10 +111,12 @@ func TrackCart(r *http.Request, sessionId int, trk view.TrackingHandler) error {
 	if err != nil {
 		return err
 	}
+	referer := r.Header.Get("Referer")
 	go trk.HandleCartEvent(view.CartEvent{
 		BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_ACTION, SessionId: sessionId, TimeStamp: time.Now().Unix()},
 		Item:      data.Item,
 		Quantity:  data.Quantity,
+		Referer:   referer,
 	})
 
 	return nil
