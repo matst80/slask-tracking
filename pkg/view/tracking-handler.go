@@ -24,13 +24,13 @@ type TrackingHandler interface {
 	GetSession(sessionId int) *SessionData
 }
 
-type UpdateHandler interface {
-	HandleUpdate(update []interface{})
-}
+// type UpdateHandler interface {
+// 	HandleUpdate(update []interface{})
+// }
 
-type PriceUpdateHandler interface {
-	HandlePriceUpdate(update []index.DataItem)
-}
+// type PriceUpdateHandler interface {
+// 	HandlePriceUpdate(update []index.DataItem)
+// }
 
 type DecayEvent struct {
 	TimeStamp int64   `json:"ts"`
@@ -117,7 +117,7 @@ type PersistentMemoryTrackingHandler struct {
 	FieldPopularity index.SortOverride   `json:"field_popularity"`
 	ItemEvents      DecayList            `json:"item_events"`
 	FieldEvents     DecayList            `json:"field_events"`
-	UpdatedItems    []interface{}        `json:"updated_items"`
+	//UpdatedItems    []interface{}        `json:"updated_items"`
 }
 
 type SessionData struct {
@@ -266,7 +266,7 @@ func MakeMemoryTrackingHandler(path string, itemsToKeep int) *PersistentMemoryTr
 			FieldPopularity: make(index.SortOverride),
 			ItemEvents:      map[uint][]DecayEvent{},
 			FieldEvents:     map[uint][]DecayEvent{},
-			UpdatedItems:    make([]interface{}, 0),
+			//UpdatedItems:    make([]interface{}, 0),
 		}
 	}
 	go func() {
@@ -295,9 +295,9 @@ func MakeMemoryTrackingHandler(path string, itemsToKeep int) *PersistentMemoryTr
 	if instance.FieldPopularity == nil {
 		instance.FieldPopularity = make(index.SortOverride)
 	}
-	if instance.UpdatedItems == nil {
-		instance.UpdatedItems = make([]interface{}, 0)
-	}
+	// if instance.UpdatedItems == nil {
+	// 	instance.UpdatedItems = make([]interface{}, 0)
+	// }
 	return instance
 }
 
@@ -407,11 +407,11 @@ func (s *PersistentMemoryTrackingHandler) GetItemPopularity() map[uint]float64 {
 	return s.ItemPopularity
 }
 
-func (s *PersistentMemoryTrackingHandler) GetUpdatedItems() []interface{} {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.UpdatedItems
-}
+// func (s *PersistentMemoryTrackingHandler) GetUpdatedItems() []interface{} {
+// 	s.mu.RLock()
+// 	defer s.mu.RUnlock()
+// 	return s.UpdatedItems
+// }
 
 func (s *PersistentMemoryTrackingHandler) GetQueries() map[string]uint {
 	s.mu.RLock()
@@ -433,25 +433,25 @@ func (s *PersistentMemoryTrackingHandler) GetSessions() []*SessionData {
 	return sessions[:i]
 }
 
-func (s *PersistentMemoryTrackingHandler) HandleUpdate(item []interface{}) {
-	// log.Printf("Session new session event %d", event.SessionId)
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.changes++
-	updatedProcessed.Inc()
-	s.UpdatedItems = append(s.UpdatedItems, item...)
-	updatedItemsProcessed.Add(float64(len(item)))
-	diff := len(s.UpdatedItems) - s.updatesToKeep
-	if diff > 0 {
-		s.UpdatedItems = s.UpdatedItems[len(s.UpdatedItems)-diff:]
-	}
-}
+// func (s *PersistentMemoryTrackingHandler) HandleUpdate(item []interface{}) {
+// 	// log.Printf("Session new session event %d", event.SessionId)
+// 	s.mu.Lock()
+// 	defer s.mu.Unlock()
+// 	s.changes++
+// 	updatedProcessed.Inc()
+// 	s.UpdatedItems = append(s.UpdatedItems, item...)
+// 	updatedItemsProcessed.Add(float64(len(item)))
+// 	diff := len(s.UpdatedItems) - s.updatesToKeep
+// 	if diff > 0 {
+// 		s.UpdatedItems = s.UpdatedItems[len(s.UpdatedItems)-diff:]
+// 	}
+// }
 
-func (s *PersistentMemoryTrackingHandler) HandlePriceUpdate(item []index.DataItem) {
-	for _, item := range item {
-		log.Printf("Price update %d, url: %s", item.Id, "https://www.elgiganten.se"+item.Url)
-	}
-}
+// func (s *PersistentMemoryTrackingHandler) HandlePriceUpdate(item []index.DataItem) {
+// 	for _, item := range item {
+// 		log.Printf("Price update %d, url: %s", item.Id, "https://www.elgiganten.se"+item.Url)
+// 	}
+// }
 
 func (s *PersistentMemoryTrackingHandler) GetFieldPopularity() index.SortOverride {
 	s.mu.RLock()

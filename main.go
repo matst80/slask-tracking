@@ -19,9 +19,10 @@ var redisPassword = os.Getenv("REDIS_PASSWORD")
 func run_application() int {
 	client := events.RabbitTransportClient{
 		RabbitTrackingConfig: events.RabbitTrackingConfig{
-			TrackingTopic:      "tracking",
-			ItemsUpsertedTopic: "item_added",
-			Url:                rabbitUrl,
+			TrackingTopic: "tracking",
+			//ItemsUpsertedTopic: "item_added",
+			Url:   rabbitUrl,
+			VHost: os.Getenv("RABBIT_HOST"),
 		},
 	}
 	viewHandler := view.MakeMemoryTrackingHandler("data/tracking.json", 500)
@@ -29,8 +30,8 @@ func run_application() int {
 
 	defer viewHandler.Save()
 	go client.Connect(viewHandler)
-	go client.ConnectUpdates(viewHandler)
-	go client.ConnectPriceUpdates(viewHandler)
+	// go client.ConnectUpdates(viewHandler)
+	// go client.ConnectPriceUpdates(viewHandler)
 	viewHandler.ConnectPopularityListener(popularityHandler)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -66,9 +67,9 @@ func run_application() int {
 	mux.HandleFunc("/tracking/queries", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		return viewHandler.GetQueries(), nil
 	}))
-	mux.HandleFunc("/tracking/updated", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-		return viewHandler.GetUpdatedItems(), nil
-	}))
+	// mux.HandleFunc("/tracking/updated", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	// 	return viewHandler.GetUpdatedItems(), nil
+	// }))
 	mux.HandleFunc("/tracking/sessions", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		return viewHandler.GetSessions(), nil
 	}))
