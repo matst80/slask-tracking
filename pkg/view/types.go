@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/matst80/slask-finder/pkg/index"
+	"github.com/matst80/slask-finder/pkg/types"
 )
 
 const (
@@ -72,7 +73,7 @@ type PurchaseEvent struct {
 
 type SearchEventData struct {
 	*BaseEvent
-	*index.Filters
+	*types.Filters
 	Query   string `json:"query,omitempty"`
 	Page    int    `json:"page,omitempty"`
 	Referer string `json:"referer,omitempty"`
