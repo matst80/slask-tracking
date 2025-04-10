@@ -12,6 +12,7 @@ const (
 	EVENT_ITEM_CLICK    = uint16(2)
 	EVENT_ITEM_IMPRESS  = uint16(5)
 	EVENT_ITEM_ACTION   = uint16(6)
+	EVENT_SUGGEST       = uint16(7)
 	EVENT_SEARCH        = uint16(1)
 )
 
@@ -102,6 +103,14 @@ type ActionEvent struct {
 	Action  string `json:"action"`
 	Reason  string `json:"reason"`
 	Referer string `json:"referer,omitempty"`
+}
+
+type SuggestEvent struct {
+	*BaseEvent
+	Value       string `json:"value,omitempty"`
+	Suggestions int    `json:"suggestions,omitempty"`
+	Results     int    `json:"results,omitempty"`
+	Referer     string `json:"referer,omitempty"`
 }
 
 func (e *Session) GetType() uint16 {

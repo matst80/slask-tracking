@@ -80,6 +80,12 @@ type ActionData struct {
 	Reason string `json:"reason"`
 }
 
+type SuggestData struct {
+	Value       string `json:"value"`
+	Suggestions int    `json:"suggestions"`
+	Results     int    `json:"results"`
+}
+
 func TrackAction(r *http.Request, sessionId int, trk view.TrackingHandler) error {
 
 	var data ActionData
@@ -94,6 +100,25 @@ func TrackAction(r *http.Request, sessionId int, trk view.TrackingHandler) error
 		Action:    data.Action,
 		Reason:    data.Reason,
 		Referer:   referer,
+	})
+
+	return nil
+}
+
+func TrackSuggest(r *http.Request, sessionId int, trk view.TrackingHandler) error {
+
+	var data SuggestData
+	err := json.NewDecoder(r.Body).Decode(&data)
+	if err != nil {
+		return err
+	}
+	referer := r.Header.Get("Referer")
+	go trk.HandleSuggestEvent(view.SuggestEvent{
+		BaseEvent:   &view.BaseEvent{Event: view.EVENT_SUGGEST, SessionId: sessionId, TimeStamp: time.Now().Unix()},
+		Value:       data.Value,
+		Suggestions: data.Suggestions,
+		Results:     data.Results,
+		Referer:     referer,
 	})
 
 	return nil

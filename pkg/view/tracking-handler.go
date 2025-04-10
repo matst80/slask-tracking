@@ -21,6 +21,7 @@ type TrackingHandler interface {
 	HandleCartEvent(event CartEvent)
 	HandleImpressionEvent(event ImpressionEvent)
 	HandleActionEvent(event ActionEvent)
+	HandleSuggestEvent(event SuggestEvent)
 	GetSession(sessionId int) *SessionData
 }
 
@@ -69,7 +70,42 @@ func (d *DecayEvent) Decay(now int64) float64 {
 	return v
 }
 
-type DecayList map[uint][]DecayEvent
+type DecayArray = []DecayEvent
+
+type DecayPopularity struct {
+	Events DecayArray
+}
+
+func (d *DecayPopularity) Add(value DecayEvent) {
+	if d.Events == nil {
+		d.Events = make([]DecayEvent, 0)
+	}
+	d.Events = append(d.Events, value)
+}
+
+func (d *DecayPopularity) Decay(now int64) float64 {
+
+	var popularity float64
+
+	for _, event := range d.Events {
+		popularity += event.Decay(now)
+	}
+
+	return popularity
+}
+
+func (d *DecayPopularity) RemoveOlderThan(when int64) {
+	end := len(d.Events)
+
+	for i, e := range d.Events {
+		if e.TimeStamp >= when {
+			end = i
+		}
+	}
+	d.Events = d.Events[:end]
+}
+
+type DecayList map[uint]DecayArray
 
 func (d *DecayList) Add(key uint, value DecayEvent) {
 	f, ok := (*d)[key]
@@ -105,18 +141,58 @@ func (d *DecayList) Decay(now int64) index.SortOverride {
 	return result
 }
 
+type QueryKeyData struct {
+	FieldPopularity DecayPopularity            `json:"popularity"`
+	ValuePopularity map[string]DecayPopularity `json:"values"`
+}
+
+type QueryMatcher struct {
+	KeyFields map[uint]QueryKeyData `json:"keyFacets"`
+}
+
+func (q *QueryMatcher) AddKeyFilterEvent(key uint, value string) {
+	if q.KeyFields == nil {
+		q.KeyFields = make(map[uint]QueryKeyData)
+	}
+	popularity, ok := q.KeyFields[key]
+	if !ok {
+		popularity = QueryKeyData{
+			FieldPopularity: DecayPopularity{},
+			ValuePopularity: make(map[string]DecayPopularity),
+		}
+		q.KeyFields[key] = popularity
+	}
+	popularity.FieldPopularity.Add(DecayEvent{
+		TimeStamp: time.Now().Unix(),
+		Value:     100,
+	})
+	if value != "" {
+		valuePopularity, ok := popularity.ValuePopularity[value]
+		if !ok {
+			valuePopularity = DecayPopularity{}
+			popularity.ValuePopularity[value] = valuePopularity
+		}
+		valuePopularity.Add(DecayEvent{
+			TimeStamp: time.Now().Unix(),
+			Value:     100,
+		})
+	}
+
+}
+
 type PersistentMemoryTrackingHandler struct {
 	path            string
 	mu              sync.RWMutex
 	changes         uint
 	updatesToKeep   int
 	trackingHandler PopularityListener
-	ItemPopularity  index.SortOverride   `json:"item_popularity"`
-	Queries         map[string]uint      `json:"queries"`
-	Sessions        map[int]*SessionData `json:"sessions"`
-	FieldPopularity index.SortOverride   `json:"field_popularity"`
-	ItemEvents      DecayList            `json:"item_events"`
-	FieldEvents     DecayList            `json:"field_events"`
+	ItemPopularity  index.SortOverride      `json:"item_popularity"`
+	Queries         map[string]uint         `json:"queries"`
+	QueryEvents     map[string]QueryMatcher `json:"query_events"`
+	Sessions        map[int]*SessionData    `json:"sessions"`
+	FieldPopularity index.SortOverride      `json:"field_popularity"`
+	ItemEvents      DecayList               `json:"item_events"`
+	FieldEvents     DecayList               `json:"field_events"`
 	//UpdatedItems    []interface{}        `json:"updated_items"`
 }
 
@@ -158,6 +234,7 @@ func (session *SessionData) HandleEvent(event interface{}) {
 		})
 
 	case SearchEventData:
+
 		for _, filter := range e.Filters.StringFilter {
 			session.FieldEvents.Add(filter.Id, DecayEvent{
 				TimeStamp: now,
@@ -531,10 +608,33 @@ func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventDat
 	defer s.mu.Unlock()
 	s.changes++
 	go opsProcessed.Inc()
-	if event.Query != "" {
-		s.Queries[event.Query] += 1
-	}
 	ts := time.Now().Unix()
+	if event.Query != "" {
+		s.Queries[event.Query] += 2
+
+		if event.Query != "" {
+			queryEvents, ok := s.QueryEvents[event.Query]
+			if !ok {
+				queryEvents = QueryMatcher{}
+				s.QueryEvents[event.Query] = queryEvents
+			}
+			for _, filter := range event.Filters.StringFilter {
+				switch filter.Value.(type) {
+				case string:
+					queryEvents.AddKeyFilterEvent(filter.Id, filter.Value.(string))
+				case []string:
+					for _, value := range filter.Value.([]string) {
+						queryEvents.AddKeyFilterEvent(filter.Id, value)
+					}
+				default:
+					log.Printf("Unknown type %T for filter %d", filter.Value, filter.Id)
+				}
+
+			}
+		}
+
+	}
+
 	for _, filter := range event.Filters.StringFilter {
 		s.FieldEvents.Add(filter.Id, DecayEvent{
 			TimeStamp: ts,
@@ -589,5 +689,15 @@ func (s *PersistentMemoryTrackingHandler) HandleActionEvent(event ActionEvent) {
 	defer s.mu.Unlock()
 	go opsProcessed.Inc()
 	s.updateSession(event, event.SessionId)
+	s.changes++
+}
+
+func (s *PersistentMemoryTrackingHandler) HandleSuggestEvent(event SuggestEvent) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	go opsProcessed.Inc()
+	s.updateSession(event, event.SessionId)
+	s.Queries[event.Value] += 1
+	log.Printf("Suggest %s", event.Value)
 	s.changes++
 }
