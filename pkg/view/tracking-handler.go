@@ -158,6 +158,7 @@ func (q *QueryMatcher) AddKeyFilterEvent(key uint, value string) {
 	if q.KeyFields == nil {
 		q.KeyFields = make(map[uint]QueryKeyData)
 	}
+
 	popularity, ok := q.KeyFields[key]
 	if !ok {
 		popularity = QueryKeyData{
@@ -180,6 +181,10 @@ func (q *QueryMatcher) AddKeyFilterEvent(key uint, value string) {
 			TimeStamp: time.Now().Unix(),
 			Value:     100,
 		})
+	}
+	popularity.FieldPopularity.Decay(time.Now().Unix())
+	for _, v := range popularity.ValuePopularity {
+		v.Decay(time.Now().Unix())
 	}
 
 }
