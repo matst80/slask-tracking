@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -73,7 +74,8 @@ func (d *DecayEvent) Decay(now int64) float64 {
 type DecayArray = []DecayEvent
 
 type DecayPopularity struct {
-	Events DecayArray
+	Events DecayArray `json:"-"`
+	Value  float64    `json:"value"`
 }
 
 func (d *DecayPopularity) Add(value DecayEvent) {
@@ -90,7 +92,7 @@ func (d *DecayPopularity) Decay(now int64) float64 {
 	for _, event := range d.Events {
 		popularity += event.Decay(now)
 	}
-
+	d.Value = popularity
 	return popularity
 }
 
@@ -147,7 +149,9 @@ type QueryKeyData struct {
 }
 
 type QueryMatcher struct {
-	KeyFields map[uint]QueryKeyData `json:"keyFacets"`
+	Popularity DecayPopularity       `json:"popularity"`
+	Query      string                `json:"query"`
+	KeyFields  map[uint]QueryKeyData `json:"keyFacets"`
 }
 
 func (q *QueryMatcher) AddKeyFilterEvent(key uint, value string) {
@@ -484,6 +488,21 @@ func (s *PersistentMemoryTrackingHandler) GetItemPopularity() map[uint]float64 {
 	return s.ItemPopularity
 }
 
+func (s *PersistentMemoryTrackingHandler) GetSuggestions(q string) interface{} {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if q == "" {
+		return s.QueryEvents
+	}
+	ret := make(map[string]QueryMatcher)
+	for key, event := range s.QueryEvents {
+		if strings.Contains(key, q) {
+			ret[key] = event
+		}
+	}
+	return ret
+}
+
 // func (s *PersistentMemoryTrackingHandler) GetUpdatedItems() []interface{} {
 // 	s.mu.RLock()
 // 	defer s.mu.RUnlock()
@@ -615,9 +634,17 @@ func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventDat
 		if event.Query != "" {
 			queryEvents, ok := s.QueryEvents[event.Query]
 			if !ok {
-				queryEvents = QueryMatcher{}
+				queryEvents = QueryMatcher{
+					Query:      event.Query,
+					Popularity: DecayPopularity{},
+				}
 				s.QueryEvents[event.Query] = queryEvents
 			}
+			queryEvents.Popularity.Add(DecayEvent{
+				TimeStamp: ts,
+				Value:     100,
+			})
+			queryEvents.Popularity.Decay(ts)
 			for _, filter := range event.Filters.StringFilter {
 				switch filter.Value.(type) {
 				case string:
