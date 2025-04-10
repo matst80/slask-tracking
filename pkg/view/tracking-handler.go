@@ -346,6 +346,7 @@ func MakeMemoryTrackingHandler(path string, itemsToKeep int) *PersistentMemoryTr
 			changes:         0,
 			updatesToKeep:   0,
 			trackingHandler: nil,
+			QueryEvents:     make(map[string]QueryMatcher),
 			ItemPopularity:  make(index.SortOverride),
 			Queries:         make(map[string]uint),
 			Sessions:        make(map[int]*SessionData),
@@ -461,7 +462,12 @@ func load(path string) (*PersistentMemoryTrackingHandler, error) {
 	}
 	defer file.Close()
 	result := &PersistentMemoryTrackingHandler{}
+
 	err = json.NewDecoder(file).Decode(result)
+	if err == nil && result.QueryEvents == nil {
+		result.QueryEvents = make(map[string]QueryMatcher)
+	}
+
 	return result, err
 }
 
