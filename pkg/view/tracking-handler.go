@@ -649,7 +649,7 @@ func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventDat
 	s.changes++
 	go opsProcessed.Inc()
 	ts := time.Now().Unix()
-	if event.Query != "" {
+	if event.Query != "" && event.Query != "*" {
 		s.Queries[event.Query] += 2
 
 		if event.Query != "" {
