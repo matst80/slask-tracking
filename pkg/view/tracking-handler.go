@@ -3,6 +3,7 @@ package view
 import (
 	"encoding/json"
 	"log"
+	"maps"
 	"math"
 	"os"
 	"runtime"
@@ -411,8 +412,17 @@ func (s *PersistentMemoryTrackingHandler) DecaySuggestions() {
 			for _, v := range keyField.ValuePopularity {
 				v.Decay(now)
 			}
+			maps.DeleteFunc(keyField.ValuePopularity, func(key string, value *DecayPopularity) bool {
+				return value.Value < 0.02
+			})
 		}
+		maps.DeleteFunc(suggestion.KeyFields, func(key uint, value QueryKeyData) bool {
+			return value.FieldPopularity.Value < 0.02
+		})
 	}
+	maps.DeleteFunc(s.QueryEvents, func(key string, value QueryMatcher) bool {
+		return value.Popularity.Value < 0.02
+	})
 	log.Printf("Decayed suggestions %d", len(s.QueryEvents))
 }
 
