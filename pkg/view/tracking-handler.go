@@ -144,12 +144,12 @@ func (d *DecayList) Decay(now int64) index.SortOverride {
 }
 
 type QueryKeyData struct {
-	FieldPopularity DecayPopularity            `json:"popularity"`
-	ValuePopularity map[string]DecayPopularity `json:"values"`
+	FieldPopularity *DecayPopularity            `json:"popularity"`
+	ValuePopularity map[string]*DecayPopularity `json:"values"`
 }
 
 type QueryMatcher struct {
-	Popularity DecayPopularity       `json:"popularity"`
+	Popularity *DecayPopularity      `json:"popularity"`
 	Query      string                `json:"query"`
 	KeyFields  map[uint]QueryKeyData `json:"keyFacets"`
 }
@@ -159,8 +159,8 @@ func (q *QueryMatcher) AddKeyFilterEvent(key uint, value string) {
 	popularity, ok := q.KeyFields[key]
 	if !ok {
 		popularity = QueryKeyData{
-			FieldPopularity: DecayPopularity{},
-			ValuePopularity: make(map[string]DecayPopularity),
+			FieldPopularity: &DecayPopularity{},
+			ValuePopularity: make(map[string]*DecayPopularity),
 		}
 		q.KeyFields[key] = popularity
 	}
@@ -171,7 +171,7 @@ func (q *QueryMatcher) AddKeyFilterEvent(key uint, value string) {
 	if value != "" {
 		valuePopularity, ok := popularity.ValuePopularity[value]
 		if !ok {
-			valuePopularity = DecayPopularity{}
+			valuePopularity = &DecayPopularity{}
 			popularity.ValuePopularity[value] = valuePopularity
 		}
 		valuePopularity.Add(DecayEvent{
@@ -657,7 +657,7 @@ func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventDat
 			if !ok {
 				queryEvents = QueryMatcher{
 					Query:      event.Query,
-					Popularity: DecayPopularity{},
+					Popularity: &DecayPopularity{},
 					KeyFields:  make(map[uint]QueryKeyData),
 				}
 				s.QueryEvents[event.Query] = queryEvents
