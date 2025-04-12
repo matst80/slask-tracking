@@ -184,18 +184,19 @@ func (q *QueryMatcher) AddKeyFilterEvent(key uint, value string) {
 }
 
 type PersistentMemoryTrackingHandler struct {
-	path            string
-	mu              sync.RWMutex
-	changes         uint
-	updatesToKeep   int
-	trackingHandler PopularityListener
-	ItemPopularity  index.SortOverride      `json:"item_popularity"`
-	Queries         map[string]uint         `json:"queries"`
-	QueryEvents     map[string]QueryMatcher `json:"suggestions"`
-	Sessions        map[int]*SessionData    `json:"sessions"`
-	FieldPopularity index.SortOverride      `json:"field_popularity"`
-	ItemEvents      DecayList               `json:"item_events"`
-	FieldEvents     DecayList               `json:"field_events"`
+	path             string
+	mu               sync.RWMutex
+	changes          uint
+	updatesToKeep    int
+	trackingHandler  PopularityListener
+	ItemPopularity   index.SortOverride                   `json:"item_popularity"`
+	Queries          map[string]uint                      `json:"queries"`
+	QueryEvents      map[string]QueryMatcher              `json:"suggestions"`
+	Sessions         map[int]*SessionData                 `json:"sessions"`
+	FieldPopularity  index.SortOverride                   `json:"field_popularity"`
+	ItemEvents       DecayList                            `json:"item_events"`
+	FieldEvents      DecayList                            `json:"field_events"`
+	FieldValueEvents map[uint]map[string]*DecayPopularity `json:"field_value_events"`
 	//UpdatedItems    []interface{}        `json:"updated_items"`
 }
 
@@ -335,18 +336,19 @@ func MakeMemoryTrackingHandler(path string, itemsToKeep int) *PersistentMemoryTr
 	instance, err := load(path)
 	if err != nil {
 		instance = &PersistentMemoryTrackingHandler{
-			path:            "data",
-			mu:              sync.RWMutex{},
-			changes:         0,
-			updatesToKeep:   0,
-			trackingHandler: nil,
-			QueryEvents:     make(map[string]QueryMatcher),
-			ItemPopularity:  make(index.SortOverride),
-			Queries:         make(map[string]uint),
-			Sessions:        make(map[int]*SessionData),
-			FieldPopularity: make(index.SortOverride),
-			ItemEvents:      map[uint][]DecayEvent{},
-			FieldEvents:     map[uint][]DecayEvent{},
+			path:             "data",
+			mu:               sync.RWMutex{},
+			changes:          0,
+			updatesToKeep:    0,
+			trackingHandler:  nil,
+			QueryEvents:      make(map[string]QueryMatcher),
+			ItemPopularity:   make(index.SortOverride),
+			Queries:          make(map[string]uint),
+			Sessions:         make(map[int]*SessionData),
+			FieldPopularity:  make(index.SortOverride),
+			ItemEvents:       map[uint][]DecayEvent{},
+			FieldEvents:      map[uint][]DecayEvent{},
+			FieldValueEvents: make(map[uint]map[string]*DecayPopularity),
 			//UpdatedItems:    make([]interface{}, 0),
 		}
 	}
@@ -484,8 +486,13 @@ func load(path string) (*PersistentMemoryTrackingHandler, error) {
 	result := &PersistentMemoryTrackingHandler{}
 
 	err = json.NewDecoder(file).Decode(result)
-	if err == nil && result.QueryEvents == nil {
-		result.QueryEvents = make(map[string]QueryMatcher)
+	if err == nil {
+		if result.QueryEvents == nil {
+			result.QueryEvents = make(map[string]QueryMatcher)
+		}
+		if result.FieldValueEvents == nil {
+			result.FieldValueEvents = make(map[uint]map[string]*DecayPopularity)
+		}
 	}
 
 	return result, err
@@ -678,20 +685,18 @@ func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventDat
 			})
 			//queryEvents.Popularity.Decay(ts)
 			for _, filter := range event.Filters.StringFilter {
-				switch filter.Value.(type) {
+				switch v := filter.Value.(type) {
 				case string:
-					queryEvents.AddKeyFilterEvent(filter.Id, filter.Value.(string))
+					queryEvents.AddKeyFilterEvent(filter.Id, v)
 				case []string:
-					for _, value := range filter.Value.([]string) {
+					for _, value := range v {
 						queryEvents.AddKeyFilterEvent(filter.Id, value)
 					}
 				default:
 					log.Printf("Unknown type %T for filter %d", filter.Value, filter.Id)
 				}
-
 			}
 		}
-
 	}
 
 	for _, filter := range event.Filters.StringFilter {
@@ -699,6 +704,35 @@ func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventDat
 			TimeStamp: ts,
 			Value:     6,
 		})
+		for _, filter := range event.Filters.StringFilter {
+			fieldValues, ok := s.FieldValueEvents[filter.Id]
+			if !ok {
+				fieldValues = make(map[string]*DecayPopularity)
+				s.FieldValueEvents[filter.Id] = fieldValues
+			}
+			addFieldValueEvent := func(value string) {
+				fieldPopularity, ok := fieldValues[value]
+				if !ok {
+					fieldPopularity = &DecayPopularity{}
+					fieldValues[value] = fieldPopularity
+				}
+				fieldPopularity.Add(DecayEvent{
+					TimeStamp: ts,
+					Value:     80,
+				})
+			}
+			switch v := filter.Value.(type) {
+			case string:
+				addFieldValueEvent(v)
+			case []string:
+				for _, value := range v {
+					addFieldValueEvent(value)
+				}
+			default:
+				log.Printf("Unknown type %T for filter %d", filter.Value, filter.Id)
+			}
+
+		}
 	}
 	for _, filter := range event.Filters.RangeFilter {
 		s.FieldEvents.Add(filter.Id, DecayEvent{
