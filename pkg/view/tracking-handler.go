@@ -407,6 +407,18 @@ func (s *PersistentMemoryTrackingHandler) DecaySuggestions() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := time.Now().Unix()
+	for query, _ := range s.QueryEvents {
+		for j := len(query) - 1; j >= 4; j-- {
+			key := query[:j]
+			if key == query {
+				continue
+			}
+			_, found := s.QueryEvents[key]
+			if found {
+				delete(s.QueryEvents, query)
+			}
+		}
+	}
 	for _, suggestion := range s.QueryEvents {
 		suggestion.Popularity.Decay(now)
 		for _, keyField := range suggestion.KeyFields {
