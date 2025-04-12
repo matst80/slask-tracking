@@ -416,6 +416,8 @@ func (s *PersistentMemoryTrackingHandler) DecaySuggestions() {
 			_, found := s.QueryEvents[key]
 			if found {
 				delete(s.QueryEvents, query)
+			} else {
+				break
 			}
 		}
 	}
