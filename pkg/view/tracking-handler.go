@@ -537,6 +537,8 @@ func (s *PersistentMemoryTrackingHandler) HandleSuggestEvent(event SuggestEvent)
 	go opsProcessed.Inc()
 	s.updateSession(event, event.SessionId)
 	s.Queries[event.Value] += 1
-	log.Printf("Suggest %s", event.Value)
+	// TODO update this to somethign useful
+	// TODO add decay to this
+	//log.Printf("Suggest %s", event.Value)
 	s.changes++
 }
