@@ -76,14 +76,17 @@ func (s *PersistentMemoryTrackingHandler) DecaySuggestions() {
 				v.Decay(now)
 			}
 			maps.DeleteFunc(keyField.ValuePopularity, func(key string, value *DecayPopularity) bool {
+				log.Printf("Deleting value popularity %s for query %s", key, suggestion.Query)
 				return value.Value < 0.02
 			})
 		}
 		maps.DeleteFunc(suggestion.KeyFields, func(key uint, value QueryKeyData) bool {
+			log.Printf("Deleting facet popularity %d for query %s", key, suggestion.Query)
 			return value.FieldPopularity.Value < 0.02
 		})
 	}
 	maps.DeleteFunc(s.QueryEvents, func(key string, value QueryMatcher) bool {
+		log.Printf("Deleting query %s", key)
 		return value.Popularity.Value < 0.02
 	})
 	log.Printf("Decayed suggestions %d", len(s.QueryEvents))

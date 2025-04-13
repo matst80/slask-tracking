@@ -45,8 +45,8 @@ func (s *SortOverrideStorage) PopularityChanged(sort *index.SortOverride) error 
 	}
 
 	_, err = s.client.Publish(s.ctx, REDIS_POPULAR_CHANGE, "external").Result()
-	if err == nil {
-		log.Println("Published popularity change")
+	if err != nil {
+		log.Printf("Error publishing popularity change: %v", err)
 	}
 	return err
 }
@@ -59,8 +59,8 @@ func (s *SortOverrideStorage) FieldPopularityChanged(sort *index.SortOverride) e
 	}
 
 	_, err = s.client.Publish(s.ctx, REDIS_FIELD_CHANGE, "external").Result()
-	if err == nil {
-		log.Println("Published field popularity change")
+	if err != nil {
+		log.Printf("Error publishing field popularity change: %v", err)
 	}
 	return err
 }
@@ -73,8 +73,8 @@ func (s *SortOverrideStorage) SessionPopularityChanged(sessionId int, sort *inde
 		return err
 	}
 	_, err = s.client.Publish(s.ctx, REDIS_SESSION_POPULAR_CHANGE, id).Result()
-	if err == nil {
-		log.Println("Published session popularity change")
+	if err != nil {
+		log.Printf("Error publishing session popularity change: %v", err)
 	}
 	return err
 }
@@ -87,8 +87,8 @@ func (s *SortOverrideStorage) SessionFieldPopularityChanged(sessionId int, sort 
 		return err
 	}
 	_, err = s.client.Publish(s.ctx, REDIS_SESSION_FIELD_CHANGE, id).Result()
-	if err == nil {
-		log.Println("Published session field popularity change")
+	if err != nil {
+		log.Printf("Error publishing session field popularity change: %v", err)
 	}
 	return err
 }
