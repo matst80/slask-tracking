@@ -3,8 +3,6 @@ package view
 import (
 	"encoding/json"
 	"log"
-	"maps"
-	"math"
 	"os"
 	"runtime"
 	"strings"
@@ -34,115 +32,6 @@ type TrackingHandler interface {
 // type PriceUpdateHandler interface {
 // 	HandlePriceUpdate(update []index.DataItem)
 // }
-
-type DecayEvent struct {
-	TimeStamp int64   `json:"ts"`
-	Value     float64 `json:"value"`
-}
-
-const (
-	decayRate = 0.9999992
-	maxAge    = 60 * 60 * 24 * 14
-)
-
-func (d *DecayEvent) CalculateValue(now int64) float64 {
-
-	// Calculate the time difference between the event timestamp and the current time.
-	timeElapsed := now - d.TimeStamp
-	if timeElapsed < 0 {
-		// If the timestamp is in the future, return the original value.
-		return d.Value
-	}
-	if timeElapsed > maxAge {
-		return 0
-	}
-
-	// Apply exponential decay formula.
-	decayedValue := d.Value * math.Pow(decayRate, float64(timeElapsed))
-
-	return decayedValue
-}
-
-func (d *DecayEvent) Decay(now int64) float64 {
-	v := d.CalculateValue(now)
-	//if v < 0.1 {
-	//	d.TimeStamp = now
-	//	d.Value = v
-	//}
-	return v
-}
-
-type DecayArray = []DecayEvent
-
-type DecayPopularity struct {
-	Events DecayArray `json:"-"`
-	Value  float64    `json:"value"`
-}
-
-func (d *DecayPopularity) Add(value DecayEvent) {
-	if d.Events == nil {
-		d.Events = make([]DecayEvent, 0)
-	}
-	d.Events = append(d.Events, value)
-}
-
-func (d *DecayPopularity) Decay(now int64) float64 {
-
-	var popularity float64
-
-	for _, event := range d.Events {
-		popularity += event.Decay(now)
-	}
-	d.Value = popularity
-	return popularity
-}
-
-func (d *DecayPopularity) RemoveOlderThan(when int64) {
-	end := len(d.Events)
-
-	for i, e := range d.Events {
-		if e.TimeStamp >= when {
-			end = i
-		}
-	}
-	d.Events = d.Events[:end]
-}
-
-type DecayList map[uint]DecayArray
-
-func (d *DecayList) Add(key uint, value DecayEvent) {
-	f, ok := (*d)[key]
-	if !ok {
-		(*d)[key] = []DecayEvent{
-			value,
-		}
-	} else {
-		f = append(f, value)
-	}
-}
-
-func (d *DecayList) Decay(now int64) index.SortOverride {
-	result := index.SortOverride{}
-	var popularity float64
-	var event DecayEvent
-	toDelete := make([]uint, 0, len(*d))
-	for itemId, events := range *d {
-		popularity = 0
-		for _, event = range events {
-			popularity += event.Decay(now)
-		}
-		if popularity > 0.3 {
-			result[itemId] = popularity
-		} else {
-			toDelete = append(toDelete, itemId)
-		}
-
-	}
-	for _, id := range toDelete {
-		delete(*d, id)
-	}
-	return result
-}
 
 type QueryKeyData struct {
 	FieldPopularity *DecayPopularity            `json:"popularity"`
@@ -284,35 +173,6 @@ func (session *SessionData) HandleEvent(event interface{}) {
 	}
 }
 
-func (session *SessionData) DecayEvents(trk PopularityListener) {
-	ts := time.Now().Unix()
-	now := ts / 60
-
-	session.LastSync = ts
-	sf := len(session.FieldEvents)
-	if sf > 0 {
-		//log.Printf("Decaying field events %d", sf)
-		session.FieldPopularity = session.FieldEvents.Decay(now)
-		//log.Printf("Session field popularity %d", len(session.FieldPopularity))
-		if len(session.FieldPopularity) > 0 {
-			if err := trk.SessionFieldPopularityChanged(session.Id, &session.FieldPopularity); err != nil {
-				log.Println(err)
-			}
-		}
-	}
-
-	si := len(session.ItemEvents)
-	if si > 0 {
-		//log.Printf("Decaying item events %d", si)
-		session.ItemPopularity = session.ItemEvents.Decay(now)
-		if len(session.ItemPopularity) > 0 {
-			if err := trk.SessionPopularityChanged(session.Id, &session.ItemPopularity); err != nil {
-				log.Println(err)
-			}
-		}
-	}
-}
-
 var (
 	opsProcessed = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "slasktracking_processed_tracking_events_total",
@@ -386,87 +246,6 @@ func MakeMemoryTrackingHandler(path string, itemsToKeep int) *PersistentMemoryTr
 
 func (s *PersistentMemoryTrackingHandler) Save() {
 	s.save()
-}
-
-func (s *PersistentMemoryTrackingHandler) DecayEvents() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	now := time.Now().Unix()
-	l := len(s.ItemEvents) + len(s.FieldEvents)
-	if l == 0 {
-		return
-	}
-
-	s.ItemPopularity = s.ItemEvents.Decay(now)
-	s.FieldPopularity = s.FieldEvents.Decay(now)
-
-	log.Printf("Decayed events %d", l)
-}
-
-func (s *PersistentMemoryTrackingHandler) DecaySuggestions() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	now := time.Now().Unix()
-	for query, _ := range s.QueryEvents {
-		for j := len(query) - 1; j >= 4; j-- {
-			key := query[:j]
-			if key == query {
-				continue
-			}
-			_, found := s.QueryEvents[key]
-			if found {
-				delete(s.QueryEvents, query)
-			} else {
-				break
-			}
-		}
-	}
-	for _, suggestion := range s.QueryEvents {
-		suggestion.Popularity.Decay(now)
-		for _, keyField := range suggestion.KeyFields {
-			keyField.FieldPopularity.Decay(now)
-			for _, v := range keyField.ValuePopularity {
-				v.Decay(now)
-			}
-			maps.DeleteFunc(keyField.ValuePopularity, func(key string, value *DecayPopularity) bool {
-				return value.Value < 0.02
-			})
-		}
-		maps.DeleteFunc(suggestion.KeyFields, func(key uint, value QueryKeyData) bool {
-			return value.FieldPopularity.Value < 0.02
-		})
-	}
-	maps.DeleteFunc(s.QueryEvents, func(key string, value QueryMatcher) bool {
-		return value.Popularity.Value < 0.02
-	})
-	log.Printf("Decayed suggestions %d", len(s.QueryEvents))
-}
-
-func (s *PersistentMemoryTrackingHandler) cleanSessions() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if len(s.Sessions) > 50000 {
-		log.Println("Cleaning sessions")
-		tm := time.Now()
-		limit := tm.Unix() - 60*60*24*7
-		for key, item := range s.Sessions {
-			if limit > item.LastUpdate {
-				log.Printf("Deleting session %d", key)
-				delete(s.Sessions, key)
-			}
-		}
-	}
-}
-
-func (s *PersistentMemoryTrackingHandler) DecaySessionEvents() {
-	if s.trackingHandler != nil {
-		for id, session := range s.Sessions {
-			if session.Id != id {
-				session.Id = id
-			}
-			session.DecayEvents(s.trackingHandler)
-		}
-	}
 }
 
 func (s *PersistentMemoryTrackingHandler) save() error {
@@ -555,12 +334,6 @@ func (s *PersistentMemoryTrackingHandler) GetSuggestions(q string) interface{} {
 	return ret
 }
 
-// func (s *PersistentMemoryTrackingHandler) GetUpdatedItems() []interface{} {
-// 	s.mu.RLock()
-// 	defer s.mu.RUnlock()
-// 	return s.UpdatedItems
-// }
-
 func (s *PersistentMemoryTrackingHandler) GetQueries() map[string]uint {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -580,26 +353,6 @@ func (s *PersistentMemoryTrackingHandler) GetSessions() []*SessionData {
 	}
 	return sessions[:i]
 }
-
-// func (s *PersistentMemoryTrackingHandler) HandleUpdate(item []interface{}) {
-// 	// log.Printf("Session new session event %d", event.SessionId)
-// 	s.mu.Lock()
-// 	defer s.mu.Unlock()
-// 	s.changes++
-// 	updatedProcessed.Inc()
-// 	s.UpdatedItems = append(s.UpdatedItems, item...)
-// 	updatedItemsProcessed.Add(float64(len(item)))
-// 	diff := len(s.UpdatedItems) - s.updatesToKeep
-// 	if diff > 0 {
-// 		s.UpdatedItems = s.UpdatedItems[len(s.UpdatedItems)-diff:]
-// 	}
-// }
-
-// func (s *PersistentMemoryTrackingHandler) HandlePriceUpdate(item []index.DataItem) {
-// 	for _, item := range item {
-// 		log.Printf("Price update %d, url: %s", item.Id, "https://www.elgiganten.se"+item.Url)
-// 	}
-// }
 
 func (s *PersistentMemoryTrackingHandler) GetFieldPopularity() index.SortOverride {
 	s.mu.RLock()
@@ -624,27 +377,6 @@ func (s *PersistentMemoryTrackingHandler) HandleSessionEvent(event Session) {
 		FieldEvents:    make(map[uint][]DecayEvent),
 	}
 }
-
-//func (s *PersistentMemoryTrackingHandler) appendItemEvent(itemId uint, value float64) {
-//	if s.ItemEvents == nil {
-//		s.ItemEvents = make(map[uint][]DecayEvent)
-//	}
-//	s.ItemEvents.Add(itemId, DecayEvent{
-//		TimeStamp: time.Now().Unix(),
-//		Value:     value,
-//	})
-//}
-//
-//func (s *PersistentMemoryTrackingHandler) appendFieldEvent(fieldId uint, value float64) {
-//	if s.FieldEvents == nil {
-//		s.FieldEvents = make(map[uint][]DecayEvent)
-//	}
-//	s.FieldEvents.Add(fieldId, DecayEvent{
-//		TimeStamp: time.Now().Unix(),
-//		Value:     value,
-//	})
-//
-//}
 
 func (s *PersistentMemoryTrackingHandler) HandleEvent(event Event) {
 	// log.Printf("Event SessionId: %d, ItemId: %d, Position: %f", event.SessionId, event.Item, event.Position)
