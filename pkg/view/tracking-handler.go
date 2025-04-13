@@ -406,6 +406,12 @@ func (s *PersistentMemoryTrackingHandler) HandleCartEvent(event CartEvent) {
 	s.updateSession(event, event.SessionId)
 }
 
+func normalizeQuery(query string) string {
+	query = strings.ToLower(query)
+	query = strings.TrimSpace(query)
+	return query
+}
+
 func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventData) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -413,10 +419,11 @@ func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventDat
 	go opsProcessed.Inc()
 	ts := time.Now().Unix()
 	if event.Query != "" && event.Query != "*" {
-		s.Queries[event.Query] += 2
+		normalizedQuery := normalizeQuery(event.Query)
+		s.Queries[normalizedQuery] += 1
 
-		if event.Query != "" {
-			queryEvents, ok := s.QueryEvents[event.Query]
+		if normalizedQuery != "" {
+			queryEvents, ok := s.QueryEvents[normalizedQuery]
 			if !ok {
 				queryEvents = QueryMatcher{
 					Query:      event.Query,
