@@ -360,6 +360,16 @@ func (s *PersistentMemoryTrackingHandler) GetFieldPopularity() index.SortOverrid
 	return s.FieldPopularity
 }
 
+func (s *PersistentMemoryTrackingHandler) GetFieldValuePopularity(id uint) interface{} {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	values, ok := s.FieldValueEvents[id]
+	if !ok {
+		return nil
+	}
+	return values
+}
+
 func (s *PersistentMemoryTrackingHandler) HandleSessionEvent(event Session) {
 	// log.Printf("Session new session event %d", event.SessionId)
 	s.mu.Lock()

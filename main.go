@@ -62,20 +62,29 @@ func run_application() int {
 		q := r.URL.Query().Get("q")
 		return viewHandler.GetSuggestions(q), nil
 	}))
-	mux.HandleFunc("/tracking/popularity", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	mux.HandleFunc("GET /tracking/popularity", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		return viewHandler.GetItemPopularity(), nil
 	}))
-	mux.HandleFunc("/tracking/field-popularity", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	mux.HandleFunc("GET /tracking/field-popularity", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		return viewHandler.GetFieldPopularity(), nil
 	}))
 
-	mux.HandleFunc("/tracking/queries", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	mux.HandleFunc("GET /tracking/field-popularity/{id}", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+		idString := r.PathValue("id")
+		id, err := strconv.Atoi(idString)
+		if err != nil {
+			return nil, err
+		}
+		return viewHandler.GetFieldValuePopularity(uint(id)), nil
+	}))
+
+	mux.HandleFunc("GET /tracking/queries", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		return viewHandler.GetQueries(), nil
 	}))
 	// mux.HandleFunc("/tracking/updated", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	// 	return viewHandler.GetUpdatedItems(), nil
 	// }))
-	mux.HandleFunc("/tracking/sessions", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	mux.HandleFunc("GET /tracking/sessions", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		return viewHandler.GetSessions(), nil
 	}))
 	mux.Handle("/metrics", promhttp.Handler())
