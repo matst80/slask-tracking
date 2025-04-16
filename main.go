@@ -45,7 +45,7 @@ func run_application() int {
 		sessionId := HandleSessionCookie(viewHandler, w, r)
 		return viewHandler.GetSession(sessionId), nil
 	}))
-	mux.HandleFunc("/tracking/{id}/session", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	mux.HandleFunc("/tracking/session/{id}", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		id := r.PathValue("id")
 		sessionId, err := strconv.Atoi(id)
 		if err != nil {
