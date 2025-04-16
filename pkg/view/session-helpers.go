@@ -1,8 +1,10 @@
 package view
 
 import (
+	"cmp"
 	"log"
 	"maps"
+	"slices"
 	"time"
 )
 
@@ -50,10 +52,25 @@ func (s *PersistentMemoryTrackingHandler) DecayEvents() {
 	log.Printf("Decayed events %d", l)
 }
 
+func byValueScore(a, b FacetValueResult) int {
+	return cmp.Compare(a.Score, b.Score)
+}
+
+func byFacetScore(a, b FacetResult) int {
+	return cmp.Compare(a.Score, b.Score)
+}
+
+func byQueryScore(a, b QueryResult) int {
+	return cmp.Compare(a.Score, b.Score)
+}
+
 func (s *PersistentMemoryTrackingHandler) DecaySuggestions() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := time.Now().Unix()
+
+	result := make([]QueryResult, 0)
+
 	for query, _ := range s.QueryEvents {
 		for j := len(query) - 1; j >= 4; j-- {
 			key := query[:j]
@@ -68,27 +85,53 @@ func (s *PersistentMemoryTrackingHandler) DecaySuggestions() {
 			}
 		}
 	}
-	for _, suggestion := range s.QueryEvents {
+
+	for q, suggestion := range s.QueryEvents {
 		suggestion.Popularity.Decay(now)
-		for _, keyField := range suggestion.KeyFields {
+		queryResult := QueryResult{
+			Query: q,
+			Score: suggestion.Popularity.Value,
+		}
+		facetResults := make([]FacetResult, 0)
+		for facetId, keyField := range suggestion.KeyFields {
+			valueResults := make([]FacetValueResult, 0)
 			keyField.FieldPopularity.Decay(now)
-			for _, v := range keyField.ValuePopularity {
-				v.Decay(now)
+			facetResult := FacetResult{
+				FacetId: facetId,
+				Score:   keyField.FieldPopularity.Value,
 			}
+			for value, v := range keyField.ValuePopularity {
+				v.Decay(now)
+				valueResults = append(valueResults, FacetValueResult{
+					Value: value,
+					Score: v.Value,
+				})
+			}
+			slices.SortFunc(valueResults, byValueScore)
+			facetResult.Values = valueResults
+			facetResults = append(facetResults, facetResult)
 			maps.DeleteFunc(keyField.ValuePopularity, func(key string, value *DecayPopularity) bool {
-				log.Printf("Deleting value popularity %s for query %s, value:%f", key, suggestion.Query, value.Value)
+				log.Printf("Deleting value popularity %s for query %s, value:%f", key, q, value.Value)
 				return value.Value < 0.0002
 			})
+
 		}
 		maps.DeleteFunc(suggestion.KeyFields, func(key uint, value QueryKeyData) bool {
-			log.Printf("Deleting facet popularity %d for query %s, value:%f", key, suggestion.Query, value.FieldPopularity.Value)
+			log.Printf("Deleting facet popularity %d for query %s, value:%f", key, q, value.FieldPopularity.Value)
 			return value.FieldPopularity.Value < 0.0002
 		})
+		slices.SortFunc(facetResults, byFacetScore)
+		queryResult.Facets = facetResults
+		result = append(result, queryResult)
 	}
+
+	slices.SortFunc(result, byQueryScore)
+
 	maps.DeleteFunc(s.QueryEvents, func(key string, value QueryMatcher) bool {
 		log.Printf("Deleting query %s, value %f", key, value.Popularity.Value)
 		return value.Popularity.Value < 0.0002
 	})
+	s.SortedQueries = result
 	log.Printf("Decayed suggestions %d", len(s.QueryEvents))
 }
 

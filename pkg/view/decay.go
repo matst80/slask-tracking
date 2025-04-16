@@ -46,7 +46,7 @@ func (d *DecayEvent) Decay(now int64) float64 {
 type DecayArray = []DecayEvent
 
 type DecayPopularity struct {
-	Events DecayArray `json:"-"`
+	Events DecayArray `json:"events"`
 	Value  float64    `json:"value"`
 }
 

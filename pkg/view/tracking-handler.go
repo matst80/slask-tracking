@@ -33,15 +33,32 @@ type TrackingHandler interface {
 // 	HandlePriceUpdate(update []index.DataItem)
 // }
 
+type FacetValueResult struct {
+	Value string  `json:"value"`
+	Score float64 `json:"score"`
+}
+
+type FacetResult struct {
+	FacetId uint               `json:"id"`
+	Score   float64            `json:"score"`
+	Values  []FacetValueResult `json:"values"`
+}
+
+type QueryResult struct {
+	Query  string        `json:"query"`
+	Score  float64       `json:"score"`
+	Facets []FacetResult `json:"facets"`
+}
+
 type QueryKeyData struct {
 	FieldPopularity *DecayPopularity            `json:"popularity"`
 	ValuePopularity map[string]*DecayPopularity `json:"values"`
 }
 
 type QueryMatcher struct {
-	Popularity *DecayPopularity      `json:"popularity"`
-	Query      string                `json:"query"`
-	KeyFields  map[uint]QueryKeyData `json:"keyFacets"`
+	Popularity *DecayPopularity `json:"popularity"`
+	//	Query      string                `json:"query"`
+	KeyFields map[uint]QueryKeyData `json:"keyFacets"`
 }
 
 func (q *QueryMatcher) AddKeyFilterEvent(key uint, value string) {
@@ -85,6 +102,7 @@ type PersistentMemoryTrackingHandler struct {
 	FieldPopularity  index.SortOverride                   `json:"field_popularity"`
 	ItemEvents       DecayList                            `json:"item_events"`
 	FieldEvents      DecayList                            `json:"field_events"`
+	SortedQueries    []QueryResult                        `json:"sorted_queries"`
 	FieldValueEvents map[uint]map[string]*DecayPopularity `json:"field_value_events"`
 	//UpdatedItems    []interface{}        `json:"updated_items"`
 }
@@ -323,15 +341,20 @@ func (s *PersistentMemoryTrackingHandler) GetSuggestions(q string) interface{} {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if q == "" {
-		return s.QueryEvents
+		return s.SortedQueries
 	}
-	ret := make(map[string]QueryMatcher)
-	for key, event := range s.QueryEvents {
-		if strings.Contains(key, q) {
-			ret[key] = event
+	lq := strings.TrimSpace(strings.ToLower(q))
+
+	matching := make([]QueryResult, 0)
+	for _, query := range s.SortedQueries {
+		if strings.Contains(query.Query, lq) {
+			matching = append(matching, query)
 		}
 	}
-	return ret
+	if len(matching) > 0 {
+		return matching
+	}
+	return []QueryResult{}
 }
 
 func (s *PersistentMemoryTrackingHandler) GetQueries() map[string]uint {
@@ -436,11 +459,11 @@ func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventDat
 			queryEvents, ok := s.QueryEvents[normalizedQuery]
 			if !ok {
 				queryEvents = QueryMatcher{
-					Query:      event.Query,
+					//Query:      event.Query,
 					Popularity: &DecayPopularity{},
 					KeyFields:  make(map[uint]QueryKeyData),
 				}
-				s.QueryEvents[event.Query] = queryEvents
+				s.QueryEvents[normalizedQuery] = queryEvents
 			}
 			queryEvents.Popularity.Add(DecayEvent{
 				TimeStamp: ts,
