@@ -111,13 +111,13 @@ func (s *PersistentMemoryTrackingHandler) DecaySuggestions() {
 			facetResult.Values = valueResults
 			facetResults = append(facetResults, facetResult)
 			maps.DeleteFunc(keyField.ValuePopularity, func(key string, value *DecayPopularity) bool {
-				log.Printf("Deleting value popularity %s for query %s, value:%f", key, q, value.Value)
+				// log.Printf("Deleting value popularity %s for query %s, value:%f", key, q, value.Value)
 				return value.Value < 0.0002
 			})
 
 		}
 		maps.DeleteFunc(suggestion.KeyFields, func(key uint, value QueryKeyData) bool {
-			log.Printf("Deleting facet popularity %d for query %s, value:%f", key, q, value.FieldPopularity.Value)
+			// log.Printf("Deleting facet popularity %d for query %s, value:%f", key, q, value.FieldPopularity.Value)
 			return value.FieldPopularity.Value < 0.0002
 		})
 		slices.SortFunc(facetResults, byFacetScore)
@@ -128,7 +128,7 @@ func (s *PersistentMemoryTrackingHandler) DecaySuggestions() {
 	slices.SortFunc(result, byQueryScore)
 
 	maps.DeleteFunc(s.QueryEvents, func(key string, value QueryMatcher) bool {
-		log.Printf("Deleting query %s, value %f", key, value.Popularity.Value)
+		// log.Printf("Deleting query %s, value %f", key, value.Popularity.Value)
 		return value.Popularity.Value < 0.0002
 	})
 	s.SortedQueries = result
