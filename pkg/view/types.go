@@ -75,9 +75,10 @@ type PurchaseEvent struct {
 type SearchEventData struct {
 	*BaseEvent
 	*types.Filters
-	Query   string `json:"query,omitempty"`
-	Page    int    `json:"page,omitempty"`
-	Referer string `json:"referer,omitempty"`
+	NumberOfResults int    `json:"noi"`
+	Query           string `json:"query,omitempty"`
+	Page            int    `json:"page,omitempty"`
+	Referer         string `json:"referer,omitempty"`
 }
 
 type PopularityListener interface {

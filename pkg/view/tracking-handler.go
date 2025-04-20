@@ -446,11 +446,15 @@ func normalizeQuery(query string) string {
 }
 
 func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventData) {
+	if event.NumberOfResults == 0 {
+		return
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.changes++
 	go opsProcessed.Inc()
 	ts := time.Now().Unix()
+
 	if event.Query != "" && event.Query != "*" {
 		normalizedQuery := normalizeQuery(event.Query)
 		s.Queries[normalizedQuery] += 1
