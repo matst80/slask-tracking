@@ -53,15 +53,15 @@ func (s *PersistentMemoryTrackingHandler) DecayEvents() {
 }
 
 func byValueScore(a, b FacetValueResult) int {
-	return cmp.Compare(a.Score, b.Score)
+	return cmp.Compare(b.Score, a.Score)
 }
 
 func byFacetScore(a, b FacetResult) int {
-	return cmp.Compare(a.Score, b.Score)
+	return cmp.Compare(b.Score, a.Score)
 }
 
 func byQueryScore(a, b QueryResult) int {
-	return cmp.Compare(a.Score, b.Score)
+	return cmp.Compare(b.Score, a.Score)
 }
 
 func (s *PersistentMemoryTrackingHandler) DecaySuggestions() {
@@ -108,6 +108,7 @@ func (s *PersistentMemoryTrackingHandler) DecaySuggestions() {
 				})
 			}
 			slices.SortFunc(valueResults, byValueScore)
+
 			facetResult.Values = valueResults
 			facetResults = append(facetResults, facetResult)
 			maps.DeleteFunc(keyField.ValuePopularity, func(key string, value *DecayPopularity) bool {
