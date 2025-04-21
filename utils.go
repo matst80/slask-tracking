@@ -34,22 +34,10 @@ func HandleSessionCookie(h view.TrackingHandler, w http.ResponseWriter, r *http.
 	if err != nil {
 		// fmt.Printf("Failed to get cookie %v", err)
 		if h != nil {
-			ip := r.Header.Get("X-Real-Ip")
-			if ip == "" {
-				ip = r.Header.Get("X-Forwarded-For")
-			}
-			if ip == "" {
-				ip = r.RemoteAddr
-			}
 
 			go h.HandleSessionEvent(view.Session{
-				BaseEvent: &view.BaseEvent{Event: view.EVENT_SESSION_START, SessionId: sessionId},
-				SessionContent: view.SessionContent{
-					Language:     r.Header.Get("Accept-Language"),
-					UserAgent:    r.UserAgent(),
-					Ip:           ip,
-					PragmaHeader: r.Header.Get("Pragma"),
-				},
+				BaseEvent:      &view.BaseEvent{Event: view.EVENT_SESSION_START, SessionId: sessionId},
+				SessionContent: *view.GetSessionContentFromRequest(r),
 			})
 		}
 		setSessionCookie(w, r, sessionId)

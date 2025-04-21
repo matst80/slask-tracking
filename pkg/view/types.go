@@ -39,6 +39,7 @@ type SessionContent struct {
 	UserAgent    string `json:"user_agent,omitempty"`
 	Ip           string `json:"ip,omitempty"`
 	Language     string `json:"language,omitempty"`
+	Referrer     string `json:"referrer,omitempty"`
 	PragmaHeader string `json:"pragma,omitempty"`
 }
 
@@ -51,14 +52,14 @@ type Event struct {
 	*BaseEvent
 	Item     uint    `json:"item"`
 	Position float32 `json:"position"`
-	Referer  string  `json:"referer,omitempty"`
+	//Referer  string  `json:"referer,omitempty"`
 }
 
 type CartEvent struct {
 	*BaseEvent
-	Item     uint   `json:"item"`
-	Quantity uint   `json:"quantity"`
-	Referer  string `json:"referer,omitempty"`
+	Item     uint `json:"item"`
+	Quantity uint `json:"quantity"`
+	//Referer  string `json:"referer,omitempty"`
 }
 
 type Purchase struct {
@@ -68,8 +69,8 @@ type Purchase struct {
 
 type PurchaseEvent struct {
 	*BaseEvent
-	Items   []Purchase `json:"items"`
-	Referer string     `json:"referer,omitempty"`
+	Items []Purchase `json:"items"`
+	//Referer string     `json:"referer,omitempty"`
 }
 
 type SearchEventData struct {
@@ -78,7 +79,7 @@ type SearchEventData struct {
 	NumberOfResults int    `json:"noi"`
 	Query           string `json:"query,omitempty"`
 	Page            int    `json:"page,omitempty"`
-	Referer         string `json:"referer,omitempty"`
+	//Referer         string `json:"referer,omitempty"`
 }
 
 type PopularityListener interface {
@@ -111,7 +112,7 @@ type SuggestEvent struct {
 	Value       string `json:"value,omitempty"`
 	Suggestions int    `json:"suggestions,omitempty"`
 	Results     int    `json:"results,omitempty"`
-	Referer     string `json:"referer,omitempty"`
+	//Referer     string `json:"referer,omitempty"`
 }
 
 func (e *Session) GetType() uint16 {
