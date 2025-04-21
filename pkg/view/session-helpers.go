@@ -139,17 +139,17 @@ func (s *PersistentMemoryTrackingHandler) DecaySuggestions() {
 func (s *PersistentMemoryTrackingHandler) cleanSessions() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if len(s.Sessions) > 50000 {
-		log.Println("Cleaning sessions")
-		tm := time.Now()
-		limit := tm.Unix() - 60*60*24*7
-		for key, item := range s.Sessions {
-			if limit > item.LastUpdate {
-				log.Printf("Deleting session %d", key)
-				delete(s.Sessions, key)
-			}
+
+	log.Println("Cleaning sessions")
+	tm := time.Now()
+	limit := tm.Unix() - 60*60*24*7
+	for key, item := range s.Sessions {
+		if limit > item.LastUpdate {
+			log.Printf("Deleting session %d", key)
+			delete(s.Sessions, key)
 		}
 	}
+
 }
 
 func (s *PersistentMemoryTrackingHandler) DecaySessionEvents() {
