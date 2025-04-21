@@ -58,6 +58,7 @@ func run_application() int {
 	mux.HandleFunc("/track/action", TrackHandler(viewHandler, TrackAction))
 	mux.HandleFunc("/track/suggest", TrackHandler(viewHandler, TrackSuggest))
 	mux.HandleFunc("/track/cart", TrackHandler(viewHandler, TrackCart))
+	mux.HandleFunc("/track/enter-checkout", TrackHandler(viewHandler, TrackCheckout))
 	mux.HandleFunc("GET /tracking/suggest", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		q := r.URL.Query().Get("q")
 		return viewHandler.GetSuggestions(q), nil
