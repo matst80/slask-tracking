@@ -124,8 +124,9 @@ func TrackSuggest(r *http.Request, sessionId int, trk view.TrackingHandler) erro
 }
 
 type CartData struct {
-	Item     uint `json:"item"`
-	Quantity uint `json:"quantity"`
+	Type     string `json:"type"`
+	Item     uint   `json:"item"`
+	Quantity uint   `json:"quantity"`
 }
 
 func TrackCart(r *http.Request, sessionId int, trk view.TrackingHandler) error {
@@ -140,6 +141,7 @@ func TrackCart(r *http.Request, sessionId int, trk view.TrackingHandler) error {
 		BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_ACTION, SessionId: sessionId, TimeStamp: time.Now().Unix()},
 		Item:      data.Item,
 		Quantity:  data.Quantity,
+		Type:      data.Type,
 		//Referer:   referer,
 	}, r)
 

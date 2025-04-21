@@ -57,8 +57,10 @@ type Event struct {
 
 type CartEvent struct {
 	*BaseEvent
-	Item     uint `json:"item"`
-	Quantity uint `json:"quantity"`
+
+	Type     string `json:"type"`
+	Item     uint   `json:"item"`
+	Quantity uint   `json:"quantity"`
 	//Referer  string `json:"referer,omitempty"`
 }
 
