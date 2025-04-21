@@ -129,6 +129,41 @@ type CartData struct {
 	Quantity uint   `json:"quantity"`
 }
 
+func getCartEventType(cartType string) uint16 {
+	switch cartType {
+	case "add":
+		return view.CART_ADD
+	case "remove":
+		return view.CART_REMOVE
+	case "quantity":
+		return view.CART_QUANTITY
+	default:
+		return view.CART_ADD
+	}
+}
+
+type CheckoutData struct {
+	Items []view.Purchase `json:"items"`
+}
+
+func TrackCheckout(r *http.Request, sessionId int, trk view.TrackingHandler) error {
+
+	var data CheckoutData
+	err := json.NewDecoder(r.Body).Decode(&data)
+	if err != nil {
+		return err
+	}
+
+	go trk.HandleEnterCheckout(view.EnterCheckoutEvent{
+		BaseEvent: &view.BaseEvent{Event: view.CART_ENTER_CHECKOUT, SessionId: sessionId, TimeStamp: time.Now().Unix()},
+		Items:     data.Items,
+
+		//Referer:   referer,
+	}, r)
+
+	return nil
+}
+
 func TrackCart(r *http.Request, sessionId int, trk view.TrackingHandler) error {
 
 	var data CartData
@@ -137,8 +172,10 @@ func TrackCart(r *http.Request, sessionId int, trk view.TrackingHandler) error {
 		return err
 	}
 
+	eventType := getCartEventType(data.Type)
+
 	go trk.HandleCartEvent(view.CartEvent{
-		BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_ACTION, SessionId: sessionId, TimeStamp: time.Now().Unix()},
+		BaseEvent: &view.BaseEvent{Event: eventType, SessionId: sessionId, TimeStamp: time.Now().Unix()},
 		Item:      data.Item,
 		Quantity:  data.Quantity,
 		Type:      data.Type,

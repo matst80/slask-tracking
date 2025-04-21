@@ -21,6 +21,7 @@ const (
 	CART_REMOVE         = uint16(12)
 	CART_CLEAR          = uint16(13)
 	CART_ENTER_CHECKOUT = uint16(14)
+	CART_QUANTITY       = uint16(15)
 )
 
 type BaseEvent struct {
@@ -52,6 +53,12 @@ type Event struct {
 	*BaseEvent
 	Item     uint    `json:"item"`
 	Position float32 `json:"position"`
+	//Referer  string  `json:"referer,omitempty"`
+}
+
+type EnterCheckoutEvent struct {
+	*BaseEvent
+	Items []Purchase `json:"items"`
 	//Referer  string  `json:"referer,omitempty"`
 }
 

@@ -21,6 +21,7 @@ type TrackingHandler interface {
 	//UpdateSessionFromRequest(sessionId int, r *http.Request)
 	HandleSearchEvent(event SearchEventData, r *http.Request)
 	HandleCartEvent(event CartEvent, r *http.Request)
+	HandleEnterCheckout(event EnterCheckoutEvent, r *http.Request)
 	HandleImpressionEvent(event ImpressionEvent, r *http.Request)
 	HandleActionEvent(event ActionEvent, r *http.Request)
 	HandleSuggestEvent(event SuggestEvent, r *http.Request)
@@ -427,6 +428,21 @@ func (s *PersistentMemoryTrackingHandler) HandleEvent(event Event, r *http.Reque
 
 	s.changes++
 	go opsProcessed.Inc()
+}
+
+func (s *PersistentMemoryTrackingHandler) HandleEnterCheckout(event EnterCheckoutEvent, r *http.Request) {
+	// log.Printf("EnterCheckout event SessionId: %d, ItemId: %d, Quantity: %d", event.SessionId, event.Item, event.Quantity)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, item := range event.Items {
+		s.ItemEvents.Add(item.Id, DecayEvent{
+			TimeStamp: time.Now().Unix(),
+			Value:     200.0 * float64(item.Quantity),
+		})
+	}
+	s.changes++
+	go opsProcessed.Inc()
+	s.updateSession(event, event.SessionId, r)
 }
 
 func (s *PersistentMemoryTrackingHandler) HandleCartEvent(event CartEvent, r *http.Request) {
