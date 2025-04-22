@@ -3,7 +3,8 @@ package view
 import "log"
 
 type Funnel struct {
-	Steps []FunnelStep `json:"steps"`
+	Name  string                 `json:"name"`
+	Steps map[string]*FunnelStep `json:"steps"`
 }
 
 type FunnelStep struct {

@@ -107,7 +107,7 @@ type PersistentMemoryTrackingHandler struct {
 	FieldEvents      DecayList                            `json:"field_events"`
 	SortedQueries    []QueryResult                        `json:"sorted_queries"`
 	FieldValueEvents map[uint]map[string]*DecayPopularity `json:"field_value_events"`
-	Funnels          []Funnel                             `json:"funnels"`
+	Funnels          []Funnel                             `json:"funnel_storage"`
 	//UpdatedItems    []interface{}        `json:"updated_items"`
 }
 
@@ -266,24 +266,26 @@ func MakeMemoryTrackingHandler(path string, itemsToKeep int) *PersistentMemoryTr
 	if instance.Funnels == nil || len(instance.Funnels) == 0 {
 		instance.Funnels = []Funnel{
 			{
-				Steps: []FunnelStep{
-					{
+
+				Steps: map[string]*FunnelStep{
+					"view": {
+
 						Name: "See item",
 						Filter: []FunnelFilter{
 							{
 								Name:      "Impression",
-								EventType: EVENT_ITEM_IMPRESS,
+								EventType: FUNNEL_EVENT_IMPRESSION,
 								Matcher:   MATCHER_NONE,
 							},
 						},
 						Events: make([]FunnelEvent, 0),
 					},
-					{
+					"cart": {
 						Name: "Add to cart",
 						Filter: []FunnelFilter{
 							{
 								Name:      "Add to cart",
-								EventType: CART_ADD,
+								EventType: FUNNEL_EVENT_CART_ADD,
 								Matcher:   MATCHER_CART,
 							},
 						},
