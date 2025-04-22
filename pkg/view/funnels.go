@@ -72,6 +72,14 @@ func (f *Funnel) ProcessEvent(evt interface{}) {
 						TimeStamp: typedEvent.TimeStamp,
 					})
 				}
+
+			case SuggestEvent:
+				if typedEvent.Event == filter.EventType {
+					step.Events = append(step.Events, FunnelEvent{
+						SessionId: typedEvent.SessionId,
+						TimeStamp: typedEvent.TimeStamp,
+					})
+				}
 			case PurchaseEvent:
 				if typedEvent.Event == filter.EventType {
 					step.Events = append(step.Events, FunnelEvent{
