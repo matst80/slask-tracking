@@ -263,8 +263,35 @@ func MakeMemoryTrackingHandler(path string, itemsToKeep int) *PersistentMemoryTr
 	if instance.FieldPopularity == nil {
 		instance.FieldPopularity = make(index.SortOverride)
 	}
-	if instance.Funnels == nil {
-		instance.Funnels = make([]Funnel, 0)
+	if instance.Funnels == nil || len(instance.Funnels) == 0 {
+		instance.Funnels = []Funnel{
+			{
+				Steps: []FunnelStep{
+					{
+						Name: "See item",
+						Filter: []FunnelFilter{
+							{
+								Name:      "Impression",
+								EventType: EVENT_ITEM_IMPRESS,
+								Matcher:   MATCHER_NONE,
+							},
+						},
+						Events: make([]FunnelEvent, 0),
+					},
+					{
+						Name: "Add to cart",
+						Filter: []FunnelFilter{
+							{
+								Name:      "Add to cart",
+								EventType: CART_ADD,
+								Matcher:   MATCHER_CART,
+							},
+						},
+						Events: make([]FunnelEvent, 0),
+					},
+				},
+			},
+		}
 	}
 	// if instance.UpdatedItems == nil {
 	// 	instance.UpdatedItems = make([]interface{}, 0)
