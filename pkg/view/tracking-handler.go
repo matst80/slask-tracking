@@ -104,6 +104,7 @@ type PersistentMemoryTrackingHandler struct {
 	FieldEvents      DecayList                            `json:"field_events"`
 	SortedQueries    []QueryResult                        `json:"sorted_queries"`
 	FieldValueEvents map[uint]map[string]*DecayPopularity `json:"field_value_events"`
+	Funnels          []Funnel                             `json:"funnels"`
 	//UpdatedItems    []interface{}        `json:"updated_items"`
 }
 
@@ -189,6 +190,7 @@ func (session *SessionData) HandleEvent(event interface{}) {
 
 		}
 	}
+
 }
 
 var (
@@ -227,6 +229,8 @@ func MakeMemoryTrackingHandler(path string, itemsToKeep int) *PersistentMemoryTr
 			ItemEvents:       map[uint][]DecayEvent{},
 			FieldEvents:      map[uint][]DecayEvent{},
 			FieldValueEvents: make(map[uint]map[string]*DecayPopularity),
+			Funnels:          make([]Funnel, 0),
+			SortedQueries:    make([]QueryResult, 0),
 			//UpdatedItems:    make([]interface{}, 0),
 		}
 	}
@@ -255,6 +259,9 @@ func MakeMemoryTrackingHandler(path string, itemsToKeep int) *PersistentMemoryTr
 	}
 	if instance.FieldPopularity == nil {
 		instance.FieldPopularity = make(index.SortOverride)
+	}
+	if instance.Funnels == nil {
+		instance.Funnels = make([]Funnel, 0)
 	}
 	// if instance.UpdatedItems == nil {
 	// 	instance.UpdatedItems = make([]interface{}, 0)
@@ -329,6 +336,20 @@ func (s *PersistentMemoryTrackingHandler) writeFile(path string) error {
 	defer file.Close()
 	err = json.NewEncoder(file).Encode(s)
 	return err
+}
+
+func (s *PersistentMemoryTrackingHandler) GetFunnels() ([]Funnel, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.Funnels, nil
+}
+
+func (s *PersistentMemoryTrackingHandler) SetFunnels(funnels []Funnel) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.changes++
+	s.Funnels = funnels
+	return nil
 }
 
 func (s *PersistentMemoryTrackingHandler) GetItemPopularity() map[uint]float64 {
@@ -421,9 +442,17 @@ func (s *PersistentMemoryTrackingHandler) HandleEvent(event Event) {
 	})
 
 	s.updateSession(event, event.SessionId)
-
+	go s.handleFunnels(event)
 	s.changes++
 	go opsProcessed.Inc()
+}
+
+func (s *PersistentMemoryTrackingHandler) handleFunnels(event interface{}) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, funnel := range s.Funnels {
+		funnel.ProcessEvent(event)
+	}
 }
 
 func (s *PersistentMemoryTrackingHandler) HandleCartEvent(event CartEvent) {
@@ -436,6 +465,7 @@ func (s *PersistentMemoryTrackingHandler) HandleCartEvent(event CartEvent) {
 	})
 	s.changes++
 	go opsProcessed.Inc()
+	go s.handleFunnels(event)
 	s.updateSession(event, event.SessionId)
 }
 
@@ -531,7 +561,7 @@ func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventDat
 		})
 	}
 	s.updateSession(event, event.SessionId)
-
+	go s.handleFunnels(event)
 }
 
 func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessionId int) {

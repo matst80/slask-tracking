@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -61,6 +62,21 @@ func run_application() int {
 	mux.HandleFunc("GET /tracking/suggest", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		q := r.URL.Query().Get("q")
 		return viewHandler.GetSuggestions(q), nil
+	}))
+	mux.HandleFunc("GET /tracking/funnels", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+		return viewHandler.GetFunnels()
+	}))
+	mux.HandleFunc("PUT /tracking/funnels", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+		var funnels []view.Funnel
+		err := json.NewDecoder(r.Body).Decode(&funnels)
+		if err != nil {
+			return nil, err
+		}
+		err = viewHandler.SetFunnels(funnels)
+		if err != nil {
+			return nil, err
+		}
+		return viewHandler.GetFunnels()
 	}))
 	mux.HandleFunc("GET /tracking/popularity", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		return viewHandler.GetItemPopularity(), nil
