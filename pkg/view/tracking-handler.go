@@ -3,6 +3,7 @@ package view
 import (
 	"encoding/json"
 	"log"
+	"net/http"
 	"os"
 	"runtime"
 	"strings"
@@ -16,12 +17,14 @@ import (
 
 type TrackingHandler interface {
 	HandleSessionEvent(event Session)
-	HandleEvent(event Event)
-	HandleSearchEvent(event SearchEventData)
-	HandleCartEvent(event CartEvent)
-	HandleImpressionEvent(event ImpressionEvent)
-	HandleActionEvent(event ActionEvent)
-	HandleSuggestEvent(event SuggestEvent)
+	HandleEvent(event Event, r *http.Request)
+	//UpdateSessionFromRequest(sessionId int, r *http.Request)
+	HandleSearchEvent(event SearchEventData, r *http.Request)
+	HandleCartEvent(event CartEvent, r *http.Request)
+	HandleEnterCheckout(event EnterCheckoutEvent, r *http.Request)
+	HandleImpressionEvent(event ImpressionEvent, r *http.Request)
+	HandleActionEvent(event ActionEvent, r *http.Request)
+	HandleSuggestEvent(event SuggestEvent, r *http.Request)
 	GetSession(sessionId int) *SessionData
 }
 
@@ -135,7 +138,7 @@ func (session *SessionData) HandleEvent(event interface{}) {
 	start := max(0, len(session.Events)-eventLimit)
 	session.Events = append(session.Events[start:], event)
 	ts := time.Now().Unix()
-	now := ts / 60
+	now := ts
 
 	session.LastUpdate = now
 	switch e := event.(type) {
@@ -276,8 +279,9 @@ func (s *PersistentMemoryTrackingHandler) Save() {
 func (s *PersistentMemoryTrackingHandler) save() error {
 	s.DecaySuggestions()
 	s.DecayEvents()
-	s.DecaySessionEvents()
 	s.cleanSessions()
+	s.DecaySessionEvents()
+
 	defer runtime.GC()
 	if s.changes == 0 {
 		return nil
@@ -432,7 +436,7 @@ func (s *PersistentMemoryTrackingHandler) HandleSessionEvent(event Session) {
 	}
 }
 
-func (s *PersistentMemoryTrackingHandler) HandleEvent(event Event) {
+func (s *PersistentMemoryTrackingHandler) HandleEvent(event Event, r *http.Request) {
 	// log.Printf("Event SessionId: %d, ItemId: %d, Position: %f", event.SessionId, event.Item, event.Position)
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -441,8 +445,9 @@ func (s *PersistentMemoryTrackingHandler) HandleEvent(event Event) {
 		Value:     40,
 	})
 
-	s.updateSession(event, event.SessionId)
 	go s.handleFunnels(event)
+	s.updateSession(event, event.SessionId, r)
+
 	s.changes++
 	go opsProcessed.Inc()
 }
@@ -455,7 +460,23 @@ func (s *PersistentMemoryTrackingHandler) handleFunnels(event interface{}) {
 	}
 }
 
-func (s *PersistentMemoryTrackingHandler) HandleCartEvent(event CartEvent) {
+func (s *PersistentMemoryTrackingHandler) HandleEnterCheckout(event EnterCheckoutEvent, r *http.Request) {
+	// log.Printf("EnterCheckout event SessionId: %d, ItemId: %d, Quantity: %d", event.SessionId, event.Item, event.Quantity)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, item := range event.Items {
+		s.ItemEvents.Add(item.Id, DecayEvent{
+			TimeStamp: time.Now().Unix(),
+			Value:     200.0 * float64(item.Quantity),
+		})
+	}
+	s.changes++
+	go opsProcessed.Inc()
+	go s.handleFunnels(event)
+	s.updateSession(event, event.SessionId, r)
+}
+
+func (s *PersistentMemoryTrackingHandler) HandleCartEvent(event CartEvent, r *http.Request) {
 	// log.Printf("Cart event SessionId: %d, ItemId: %d, Quantity: %d", event.SessionId, event.Item, event.Quantity)
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -466,7 +487,7 @@ func (s *PersistentMemoryTrackingHandler) HandleCartEvent(event CartEvent) {
 	s.changes++
 	go opsProcessed.Inc()
 	go s.handleFunnels(event)
-	s.updateSession(event, event.SessionId)
+	s.updateSession(event, event.SessionId, r)
 }
 
 func normalizeQuery(query string) string {
@@ -475,7 +496,18 @@ func normalizeQuery(query string) string {
 	return query
 }
 
-func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventData) {
+func (s *PersistentMemoryTrackingHandler) UpdateSessionFromRequest(sessionId int, r *http.Request) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	session, ok := s.Sessions[sessionId]
+	if ok {
+		session.Ip = r.RemoteAddr
+		s.Sessions[sessionId] = session
+	}
+
+}
+
+func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventData, r *http.Request) {
 	if event.NumberOfResults == 0 {
 		return
 	}
@@ -501,7 +533,7 @@ func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventDat
 			}
 			queryEvents.Popularity.Add(DecayEvent{
 				TimeStamp: ts,
-				Value:     100,
+				Value:     50.0 + (float64(event.NumberOfResults) * 0.5),
 			})
 			//queryEvents.Popularity.Decay(ts)
 			for _, filter := range event.Filters.StringFilter {
@@ -560,18 +592,21 @@ func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventDat
 			Value:     3,
 		})
 	}
-	s.updateSession(event, event.SessionId)
+
 	go s.handleFunnels(event)
+	s.updateSession(event, event.SessionId, r)
+
 }
 
-func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessionId int) {
+func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessionId int, r *http.Request) {
 
 	session, ok := s.Sessions[sessionId]
+	now := time.Now().Unix()
 	if !ok {
 		session = &SessionData{
 			SessionContent: &SessionContent{},
-			Created:        time.Now().Unix(),
-			LastUpdate:     time.Now().Unix(),
+			Created:        now,
+			LastUpdate:     now,
 			LastSync:       0,
 			Id:             sessionId,
 			Events:         make([]interface{}, 0),
@@ -579,37 +614,46 @@ func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessi
 			FieldEvents:    make(map[uint][]DecayEvent),
 		}
 		s.Sessions[sessionId] = session
+	} else {
+
+		session.LastUpdate = now
+		if r != nil {
+			session.SessionContent = GetSessionContentFromRequest(r)
+		}
 	}
 
 	session.HandleEvent(event)
 
 }
 
-func (s *PersistentMemoryTrackingHandler) HandleImpressionEvent(event ImpressionEvent) {
+func (s *PersistentMemoryTrackingHandler) HandleImpressionEvent(event ImpressionEvent, r *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	go opsProcessed.Inc()
 	for _, impression := range event.Items {
 		s.ItemPopularity[impression.Id] += 0.01 + float64(impression.Position)/1000
 	}
-	s.updateSession(event, event.SessionId)
+	s.updateSession(event, event.SessionId, r)
+	go s.handleFunnels(event)
 	s.changes++
 
 }
 
-func (s *PersistentMemoryTrackingHandler) HandleActionEvent(event ActionEvent) {
+func (s *PersistentMemoryTrackingHandler) HandleActionEvent(event ActionEvent, r *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	go opsProcessed.Inc()
-	s.updateSession(event, event.SessionId)
+	s.updateSession(event, event.SessionId, r)
+	go s.handleFunnels(event)
 	s.changes++
 }
 
-func (s *PersistentMemoryTrackingHandler) HandleSuggestEvent(event SuggestEvent) {
+func (s *PersistentMemoryTrackingHandler) HandleSuggestEvent(event SuggestEvent, r *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	go opsProcessed.Inc()
-	s.updateSession(event, event.SessionId)
+	s.updateSession(event, event.SessionId, r)
+	go s.handleFunnels(event)
 	s.Queries[event.Value] += 1
 	// TODO update this to somethign useful
 	// TODO add decay to this

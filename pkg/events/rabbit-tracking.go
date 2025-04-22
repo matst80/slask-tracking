@@ -139,7 +139,7 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 				var searchEventData view.SearchEventData
 				if err := json.Unmarshal(d.Body, &searchEventData); err == nil {
 					searchEventData.SetTimestamp()
-					handler.HandleSearchEvent(searchEventData)
+					handler.HandleSearchEvent(searchEventData, nil)
 				} else {
 					log.Printf("Failed to unmarshal search event message %v", err)
 				}
@@ -147,7 +147,7 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 				var event view.Event
 				if err := json.Unmarshal(d.Body, &event); err == nil {
 					event.SetTimestamp()
-					handler.HandleEvent(event)
+					handler.HandleEvent(event, nil)
 				} else {
 					log.Printf("Failed to unmarshal event message %v", err)
 				}
@@ -155,7 +155,7 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 				var cartEvent view.CartEvent
 				if err := json.Unmarshal(d.Body, &cartEvent); err == nil {
 					cartEvent.SetTimestamp()
-					handler.HandleCartEvent(cartEvent)
+					handler.HandleCartEvent(cartEvent, nil)
 				} else {
 					log.Printf("Failed to unmarshal cart event message %v", err)
 				}
@@ -163,7 +163,7 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 				var cartEvent view.CartEvent
 				if err := json.Unmarshal(d.Body, &cartEvent); err == nil {
 					cartEvent.SetTimestamp()
-					handler.HandleCartEvent(cartEvent)
+					handler.HandleCartEvent(cartEvent, nil)
 				} else {
 					log.Printf("Failed to unmarshal cart event message %v", err)
 				}
@@ -171,7 +171,7 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 				var impressionsEvent view.ImpressionEvent
 				if err := json.Unmarshal(d.Body, &impressionsEvent); err == nil {
 					impressionsEvent.SetTimestamp()
-					handler.HandleImpressionEvent(impressionsEvent)
+					handler.HandleImpressionEvent(impressionsEvent, nil)
 				} else {
 					log.Printf("Failed to unmarshal impressions event message %v", err)
 				}
@@ -179,7 +179,7 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 				var actionEvent view.ActionEvent
 				if err := json.Unmarshal(d.Body, &actionEvent); err == nil {
 					actionEvent.SetTimestamp()
-					handler.HandleActionEvent(actionEvent)
+					handler.HandleActionEvent(actionEvent, nil)
 				} else {
 					log.Printf("Failed to unmarshal impressions event message %v", err)
 				}

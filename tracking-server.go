@@ -45,7 +45,6 @@ func TrackClick(r *http.Request, sessionId int, trk view.TrackingHandler) error 
 	itemId, err := strconv.Atoi(id)
 	pos := r.URL.Query().Get("pos")
 	position, _ := strconv.Atoi(pos)
-	referer := r.Header.Get("Referer")
 	if err != nil {
 		return err
 	}
@@ -54,8 +53,8 @@ func TrackClick(r *http.Request, sessionId int, trk view.TrackingHandler) error 
 		BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_CLICK, SessionId: sessionId, TimeStamp: time.Now().Unix()},
 		Item:      uint(itemId),
 		Position:  float32(position) / 100.0,
-		Referer:   referer,
-	})
+		//Referer:   referer,
+	}, r)
 	return nil
 }
 
@@ -69,7 +68,7 @@ func TrackImpression(r *http.Request, sessionId int, trk view.TrackingHandler) e
 	go trk.HandleImpressionEvent(view.ImpressionEvent{
 		BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_IMPRESS, SessionId: sessionId, TimeStamp: time.Now().Unix()},
 		Items:     data,
-	})
+	}, r)
 
 	return nil
 }
@@ -100,7 +99,7 @@ func TrackAction(r *http.Request, sessionId int, trk view.TrackingHandler) error
 		Action:    data.Action,
 		Reason:    data.Reason,
 		Referer:   referer,
-	})
+	}, r)
 
 	return nil
 }
@@ -112,21 +111,57 @@ func TrackSuggest(r *http.Request, sessionId int, trk view.TrackingHandler) erro
 	if err != nil {
 		return err
 	}
-	referer := r.Header.Get("Referer")
+
 	go trk.HandleSuggestEvent(view.SuggestEvent{
 		BaseEvent:   &view.BaseEvent{Event: view.EVENT_SUGGEST, SessionId: sessionId, TimeStamp: time.Now().Unix()},
 		Value:       data.Value,
 		Suggestions: data.Suggestions,
 		Results:     data.Results,
-		Referer:     referer,
-	})
+		//Referer:     referer,
+	}, r)
 
 	return nil
 }
 
 type CartData struct {
-	Item     uint `json:"item"`
-	Quantity uint `json:"quantity"`
+	Type     string `json:"type"`
+	Item     uint   `json:"item"`
+	Quantity uint   `json:"quantity"`
+}
+
+func getCartEventType(cartType string) uint16 {
+	switch cartType {
+	case "add":
+		return view.CART_ADD
+	case "remove":
+		return view.CART_REMOVE
+	case "quantity":
+		return view.CART_QUANTITY
+	default:
+		return view.CART_ADD
+	}
+}
+
+type CheckoutData struct {
+	Items []view.Purchase `json:"items"`
+}
+
+func TrackCheckout(r *http.Request, sessionId int, trk view.TrackingHandler) error {
+
+	var data CheckoutData
+	err := json.NewDecoder(r.Body).Decode(&data)
+	if err != nil {
+		return err
+	}
+
+	go trk.HandleEnterCheckout(view.EnterCheckoutEvent{
+		BaseEvent: &view.BaseEvent{Event: view.CART_ENTER_CHECKOUT, SessionId: sessionId, TimeStamp: time.Now().Unix()},
+		Items:     data.Items,
+
+		//Referer:   referer,
+	}, r)
+
+	return nil
 }
 
 func TrackCart(r *http.Request, sessionId int, trk view.TrackingHandler) error {
@@ -136,13 +171,16 @@ func TrackCart(r *http.Request, sessionId int, trk view.TrackingHandler) error {
 	if err != nil {
 		return err
 	}
-	referer := r.Header.Get("Referer")
+
+	eventType := getCartEventType(data.Type)
+
 	go trk.HandleCartEvent(view.CartEvent{
-		BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_ACTION, SessionId: sessionId, TimeStamp: time.Now().Unix()},
+		BaseEvent: &view.BaseEvent{Event: eventType, SessionId: sessionId, TimeStamp: time.Now().Unix()},
 		Item:      data.Item,
 		Quantity:  data.Quantity,
-		Referer:   referer,
-	})
+		Type:      data.Type,
+		//Referer:   referer,
+	}, r)
 
 	return nil
 }
