@@ -1,5 +1,7 @@
 package view
 
+import "log"
+
 type Funnel struct {
 	Steps []FunnelStep `json:"steps"`
 }
@@ -29,6 +31,14 @@ type FunnelEvent struct {
 	TimeStamp int64
 }
 
+func (s *FunnelStep) AddEvent(evt FunnelEvent) {
+	s.Events = append(s.Events, evt)
+}
+
+func (s *FunnelStep) ClearEvents() {
+	s.Events = []FunnelEvent{}
+}
+
 func (f *Funnel) ProcessEvent(evt interface{}) {
 	for _, step := range f.Steps {
 		for _, filter := range step.Filter {
@@ -42,6 +52,8 @@ func (f *Funnel) ProcessEvent(evt interface{}) {
 						SessionId: typedEvent.SessionId,
 						TimeStamp: typedEvent.TimeStamp,
 					})
+				} else {
+					log.Printf("[funnel] Event type mismatch: expected %d, got %d", filter.EventType, typedEvent.Event)
 				}
 			case ImpressionEvent:
 				if typedEvent.Event == filter.EventType {
@@ -49,6 +61,17 @@ func (f *Funnel) ProcessEvent(evt interface{}) {
 						SessionId: typedEvent.SessionId,
 						TimeStamp: typedEvent.TimeStamp,
 					})
+				} else {
+					log.Printf("[funnel] ImpressionEvent type mismatch: expected %d, got %d", filter.EventType, typedEvent.Event)
+				}
+			case EnterCheckoutEvent:
+				if typedEvent.Event == filter.EventType {
+					step.Events = append(step.Events, FunnelEvent{
+						SessionId: typedEvent.SessionId,
+						TimeStamp: typedEvent.TimeStamp,
+					})
+				} else {
+					log.Printf("[funnel] EnterCheckoutEvent type mismatch: expected %d, got %d", filter.EventType, typedEvent.Event)
 				}
 			case CartEvent:
 				if typedEvent.Event == filter.EventType {
@@ -56,6 +79,8 @@ func (f *Funnel) ProcessEvent(evt interface{}) {
 						SessionId: typedEvent.SessionId,
 						TimeStamp: typedEvent.TimeStamp,
 					})
+				} else {
+					log.Printf("[funnel] CartEvent type mismatch: expected %d, got %d", filter.EventType, typedEvent.Event)
 				}
 
 			case SearchEventData:
@@ -64,6 +89,8 @@ func (f *Funnel) ProcessEvent(evt interface{}) {
 						SessionId: typedEvent.SessionId,
 						TimeStamp: typedEvent.TimeStamp,
 					})
+				} else {
+					log.Printf("[funnel] SearchEventData type mismatch: expected %d, got %d", filter.EventType, typedEvent.Event)
 				}
 			case ActionEvent:
 				if typedEvent.Event == filter.EventType {
@@ -71,6 +98,8 @@ func (f *Funnel) ProcessEvent(evt interface{}) {
 						SessionId: typedEvent.SessionId,
 						TimeStamp: typedEvent.TimeStamp,
 					})
+				} else {
+					log.Printf("[funnel] ActionEvent type mismatch: expected %d, got %d", filter.EventType, typedEvent.Event)
 				}
 
 			case SuggestEvent:
@@ -79,6 +108,8 @@ func (f *Funnel) ProcessEvent(evt interface{}) {
 						SessionId: typedEvent.SessionId,
 						TimeStamp: typedEvent.TimeStamp,
 					})
+				} else {
+					log.Printf("[funnel] SuggestEvent type mismatch: expected %d, got %d", filter.EventType, typedEvent.Event)
 				}
 			case PurchaseEvent:
 				if typedEvent.Event == filter.EventType {
@@ -86,7 +117,12 @@ func (f *Funnel) ProcessEvent(evt interface{}) {
 						SessionId: typedEvent.SessionId,
 						TimeStamp: typedEvent.TimeStamp,
 					})
+				} else {
+					log.Printf("[funnel] PurchaseEvent type mismatch: expected %d, got %d", filter.EventType, typedEvent.Event)
 				}
+			default:
+				// Handle other event types if necessary
+				log.Printf("[funnel] Unknown event type: %T", typedEvent)
 			}
 		}
 	}
