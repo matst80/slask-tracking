@@ -1,6 +1,9 @@
 package view
 
-import "log"
+import (
+	"fmt"
+	"log"
+)
 
 type Funnel struct {
 	Name  string                 `json:"name"`
@@ -42,8 +45,9 @@ const (
 )
 
 type FunnelEvent struct {
-	SessionId int
-	TimeStamp int64
+	SessionId int      `json:"session_id"`
+	TimeStamp int64    `json:"ts,omitempty"`
+	Tags      []string `json:"tags,omitempty"`
 }
 
 func (s *FunnelStep) AddEvent(evt FunnelEvent) {
@@ -67,20 +71,31 @@ func (f *Funnel) ProcessEvent(evt interface{}) {
 					step.AddEvent(FunnelEvent{
 						SessionId: typedEvent.SessionId,
 						TimeStamp: typedEvent.TimeStamp,
+						Tags:      []string{fmt.Sprintf("%d", typedEvent.Item)},
 					})
 				}
 			case ImpressionEvent:
 				if FUNNEL_EVENT_IMPRESSION == filter.EventType {
+					tags := make([]string, 0)
+					for _, item := range typedEvent.Items {
+						tags = append(tags, fmt.Sprintf("%d", item.Id))
+					}
 					step.AddEvent(FunnelEvent{
 						SessionId: typedEvent.SessionId,
 						TimeStamp: typedEvent.TimeStamp,
+						Tags:      tags,
 					})
 				}
 			case EnterCheckoutEvent:
+				tags := make([]string, 0)
+				for _, item := range typedEvent.Items {
+					tags = append(tags, fmt.Sprintf("%d", item.Id))
+				}
 				if FUNNEL_EVENT_CART_ENTER_CHECKOUT == filter.EventType {
 					step.AddEvent(FunnelEvent{
 						SessionId: typedEvent.SessionId,
 						TimeStamp: typedEvent.TimeStamp,
+						Tags:      tags,
 					})
 				}
 			case CartEvent:
@@ -88,6 +103,7 @@ func (f *Funnel) ProcessEvent(evt interface{}) {
 					step.AddEvent(FunnelEvent{
 						SessionId: typedEvent.SessionId,
 						TimeStamp: typedEvent.TimeStamp,
+						Tags:      []string{fmt.Sprintf("%d", typedEvent.Item)},
 					})
 				}
 
@@ -103,6 +119,7 @@ func (f *Funnel) ProcessEvent(evt interface{}) {
 					step.AddEvent(FunnelEvent{
 						SessionId: typedEvent.SessionId,
 						TimeStamp: typedEvent.TimeStamp,
+						Tags:      []string{fmt.Sprintf("%d", typedEvent.Item)},
 					})
 				}
 
@@ -115,9 +132,14 @@ func (f *Funnel) ProcessEvent(evt interface{}) {
 				}
 			case PurchaseEvent:
 				if FUNNEL_EVENT_PURCHASE == filter.EventType {
+					tags := make([]string, 0)
+					for _, item := range typedEvent.Items {
+						tags = append(tags, fmt.Sprintf("%d", item.Id))
+					}
 					step.AddEvent(FunnelEvent{
 						SessionId: typedEvent.SessionId,
 						TimeStamp: typedEvent.TimeStamp,
+						Tags:      tags,
 					})
 				}
 			default:
