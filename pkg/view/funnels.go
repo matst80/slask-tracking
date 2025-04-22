@@ -26,6 +26,20 @@ type FunnelFilter struct {
 	Matcher   Matcher `json:"matcher,omitempty"`
 }
 
+const (
+	FUNNEL_EVENT_ITEM_EVENT          = uint16(0)
+	FUNNEL_EVENT_IMPRESSION          = uint16(1)
+	FUNNEL_EVENT_ENTER_CHECKOUT      = uint16(2)
+	FUNNEL_EVENT_CART_ADD            = uint16(3)
+	FUNNEL_EVENT_CART_REMOVE         = uint16(4)
+	FUNNEL_EVENT_CART_CLEAR          = uint16(5)
+	FUNNEL_EVENT_CART_ENTER_CHECKOUT = uint16(6)
+	FUNNEL_EVENT_SEARCH              = uint16(7)
+	FUNNEL_EVENT_ACTION              = uint16(8)
+	FUNNEL_EVENT_SUGGEST             = uint16(9)
+	FUNNEL_EVENT_PURCHASE            = uint16(10)
+)
+
 type FunnelEvent struct {
 	SessionId int
 	TimeStamp int64
@@ -33,6 +47,7 @@ type FunnelEvent struct {
 
 func (s *FunnelStep) AddEvent(evt FunnelEvent) {
 	s.Events = append(s.Events, evt)
+	log.Printf("[funnel] Added event to step %s", s.Name)
 }
 
 func (s *FunnelStep) ClearEvents() {
@@ -47,78 +62,62 @@ func (f *Funnel) ProcessEvent(evt interface{}) {
 			}
 			switch typedEvent := evt.(type) {
 			case Event:
-				if typedEvent.Event == filter.EventType {
-					step.Events = append(step.Events, FunnelEvent{
+				if FUNNEL_EVENT_ITEM_EVENT == filter.EventType {
+					step.AddEvent(FunnelEvent{
 						SessionId: typedEvent.SessionId,
 						TimeStamp: typedEvent.TimeStamp,
 					})
-				} else {
-					log.Printf("[funnel] Event type mismatch: expected %d, got %d", filter.EventType, typedEvent.Event)
 				}
 			case ImpressionEvent:
-				if typedEvent.Event == filter.EventType {
-					step.Events = append(step.Events, FunnelEvent{
+				if FUNNEL_EVENT_IMPRESSION == filter.EventType {
+					step.AddEvent(FunnelEvent{
 						SessionId: typedEvent.SessionId,
 						TimeStamp: typedEvent.TimeStamp,
 					})
-				} else {
-					log.Printf("[funnel] ImpressionEvent type mismatch: expected %d, got %d", filter.EventType, typedEvent.Event)
 				}
 			case EnterCheckoutEvent:
-				if typedEvent.Event == filter.EventType {
-					step.Events = append(step.Events, FunnelEvent{
+				if FUNNEL_EVENT_CART_ENTER_CHECKOUT == filter.EventType {
+					step.AddEvent(FunnelEvent{
 						SessionId: typedEvent.SessionId,
 						TimeStamp: typedEvent.TimeStamp,
 					})
-				} else {
-					log.Printf("[funnel] EnterCheckoutEvent type mismatch: expected %d, got %d", filter.EventType, typedEvent.Event)
 				}
 			case CartEvent:
-				if typedEvent.Event == filter.EventType {
-					step.Events = append(step.Events, FunnelEvent{
+				if FUNNEL_EVENT_CART_ADD == filter.EventType {
+					step.AddEvent(FunnelEvent{
 						SessionId: typedEvent.SessionId,
 						TimeStamp: typedEvent.TimeStamp,
 					})
-				} else {
-					log.Printf("[funnel] CartEvent type mismatch: expected %d, got %d", filter.EventType, typedEvent.Event)
 				}
 
 			case SearchEventData:
-				if typedEvent.Event == filter.EventType {
-					step.Events = append(step.Events, FunnelEvent{
+				if FUNNEL_EVENT_SEARCH == filter.EventType {
+					step.AddEvent(FunnelEvent{
 						SessionId: typedEvent.SessionId,
 						TimeStamp: typedEvent.TimeStamp,
 					})
-				} else {
-					log.Printf("[funnel] SearchEventData type mismatch: expected %d, got %d", filter.EventType, typedEvent.Event)
 				}
 			case ActionEvent:
-				if typedEvent.Event == filter.EventType {
-					step.Events = append(step.Events, FunnelEvent{
+				if FUNNEL_EVENT_ACTION == filter.EventType {
+					step.AddEvent(FunnelEvent{
 						SessionId: typedEvent.SessionId,
 						TimeStamp: typedEvent.TimeStamp,
 					})
-				} else {
-					log.Printf("[funnel] ActionEvent type mismatch: expected %d, got %d", filter.EventType, typedEvent.Event)
 				}
 
 			case SuggestEvent:
-				if typedEvent.Event == filter.EventType {
-					step.Events = append(step.Events, FunnelEvent{
+				if FUNNEL_EVENT_SUGGEST == filter.EventType {
+					step.AddEvent(FunnelEvent{
 						SessionId: typedEvent.SessionId,
 						TimeStamp: typedEvent.TimeStamp,
 					})
-				} else {
-					log.Printf("[funnel] SuggestEvent type mismatch: expected %d, got %d", filter.EventType, typedEvent.Event)
 				}
 			case PurchaseEvent:
-				if typedEvent.Event == filter.EventType {
-					step.Events = append(step.Events, FunnelEvent{
+				if FUNNEL_EVENT_PURCHASE == filter.EventType {
+					step.AddEvent(FunnelEvent{
 						SessionId: typedEvent.SessionId,
 						TimeStamp: typedEvent.TimeStamp,
 					})
-				} else {
-					log.Printf("[funnel] PurchaseEvent type mismatch: expected %d, got %d", filter.EventType, typedEvent.Event)
 				}
 			default:
 				// Handle other event types if necessary
