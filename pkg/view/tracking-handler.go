@@ -19,7 +19,7 @@ type TrackingHandler interface {
 	HandleSessionEvent(event Session)
 	HandleEvent(event Event, r *http.Request)
 	//UpdateSessionFromRequest(sessionId int, r *http.Request)
-	HandleSearchEvent(event SearchEventData, r *http.Request)
+	HandleSearchEvent(event SearchEvent, r *http.Request)
 	HandleCartEvent(event CartEvent, r *http.Request)
 	HandleEnterCheckout(event EnterCheckoutEvent, r *http.Request)
 	HandleImpressionEvent(event ImpressionEvent, r *http.Request)
@@ -148,7 +148,7 @@ func (session *SessionData) HandleEvent(event interface{}) {
 			Value:     509,
 		})
 
-	case SearchEventData:
+	case SearchEvent:
 
 		for _, filter := range e.Filters.StringFilter {
 			session.FieldEvents.Add(filter.Id, DecayEvent{
@@ -474,14 +474,14 @@ func (s *PersistentMemoryTrackingHandler) HandleEvent(event Event, r *http.Reque
 		Value:     40,
 	})
 
-	go s.handleFunnels(event)
+	go s.handleFunnels(&event)
 	s.updateSession(event, event.SessionId, r)
 
 	s.changes++
 	go opsProcessed.Inc()
 }
 
-func (s *PersistentMemoryTrackingHandler) handleFunnels(event interface{}) {
+func (s *PersistentMemoryTrackingHandler) handleFunnels(event TrackingEvent) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, funnel := range s.Funnels {
@@ -501,7 +501,7 @@ func (s *PersistentMemoryTrackingHandler) HandleEnterCheckout(event EnterCheckou
 	}
 	s.changes++
 	go opsProcessed.Inc()
-	go s.handleFunnels(event)
+	go s.handleFunnels(&event)
 	s.updateSession(event, event.SessionId, r)
 }
 
@@ -515,7 +515,7 @@ func (s *PersistentMemoryTrackingHandler) HandleCartEvent(event CartEvent, r *ht
 	})
 	s.changes++
 	go opsProcessed.Inc()
-	go s.handleFunnels(event)
+	go s.handleFunnels(&event)
 	s.updateSession(event, event.SessionId, r)
 }
 
@@ -536,7 +536,7 @@ func (s *PersistentMemoryTrackingHandler) UpdateSessionFromRequest(sessionId int
 
 }
 
-func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventData, r *http.Request) {
+func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEvent, r *http.Request) {
 	if event.NumberOfResults == 0 {
 		return
 	}
@@ -622,7 +622,7 @@ func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEventDat
 		})
 	}
 
-	go s.handleFunnels(event)
+	go s.handleFunnels(&event)
 	s.updateSession(event, event.SessionId, r)
 
 }
@@ -663,7 +663,7 @@ func (s *PersistentMemoryTrackingHandler) HandleImpressionEvent(event Impression
 		s.ItemPopularity[impression.Id] += 0.01 + float64(impression.Position)/1000
 	}
 	s.updateSession(event, event.SessionId, r)
-	go s.handleFunnels(event)
+	go s.handleFunnels(&event)
 	s.changes++
 
 }
@@ -673,7 +673,7 @@ func (s *PersistentMemoryTrackingHandler) HandleActionEvent(event ActionEvent, r
 	defer s.mu.Unlock()
 	go opsProcessed.Inc()
 	s.updateSession(event, event.SessionId, r)
-	go s.handleFunnels(event)
+	go s.handleFunnels(&event)
 	s.changes++
 }
 
@@ -682,7 +682,7 @@ func (s *PersistentMemoryTrackingHandler) HandleSuggestEvent(event SuggestEvent,
 	defer s.mu.Unlock()
 	go opsProcessed.Inc()
 	s.updateSession(event, event.SessionId, r)
-	go s.handleFunnels(event)
+	go s.handleFunnels(&event)
 	s.Queries[event.Value] += 1
 	// TODO update this to somethign useful
 	// TODO add decay to this

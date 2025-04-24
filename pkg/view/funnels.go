@@ -11,9 +11,11 @@ type Funnel struct {
 }
 
 type FunnelStep struct {
-	Name   string         `json:"name"`
-	Filter []FunnelFilter `json:"filter"`
-	Events []FunnelEvent  `json:"events"`
+	Name          string         `json:"name"`
+	SessionUnique bool           `json:"session_unique"`
+	Sessions      map[int]int    `json:"sessions,omitempty"`
+	Filter        []FunnelFilter `json:"filter"`
+	Events        []FunnelEvent  `json:"events"`
 }
 
 type Matcher string
@@ -59,14 +61,39 @@ func (s *FunnelStep) ClearEvents() {
 	s.Events = []FunnelEvent{}
 }
 
-func (f *Funnel) ProcessEvent(evt interface{}) {
+func (s *FunnelStep) Handle(base *BaseEvent, tags []string) {
+	if s.Sessions == nil {
+		s.Sessions = make(map[int]int)
+	}
+	if s.SessionUnique && base.SessionId == 0 {
+		return
+	}
+	if s.SessionUnique {
+		if _, ok := s.Sessions[base.SessionId]; ok {
+			s.Sessions[base.SessionId]++
+			return
+		}
+	}
+}
+
+func (f *Funnel) ProcessEvent(evt TrackingEvent) {
+	base := evt.GetBaseEvent()
+	tags := evt.GetTags()
+
 	for _, step := range f.Steps {
 		for _, filter := range step.Filter {
 			if filter.EventType == 0 {
 				continue
 			}
+			step.Handle(base, tags)
 			switch typedEvent := evt.(type) {
-			case Event:
+			case *Event:
+				if step.SessionUnique {
+					if _, ok := step.Sessions[typedEvent.SessionId]; ok {
+						step.Sessions[typedEvent.SessionId]++
+						continue
+					}
+				}
 				if FUNNEL_EVENT_ITEM_EVENT == filter.EventType {
 					step.AddEvent(FunnelEvent{
 						SessionId: typedEvent.SessionId,
@@ -74,7 +101,7 @@ func (f *Funnel) ProcessEvent(evt interface{}) {
 						Tags:      []string{fmt.Sprintf("%d", typedEvent.Item)},
 					})
 				}
-			case ImpressionEvent:
+			case *ImpressionEvent:
 				if FUNNEL_EVENT_IMPRESSION == filter.EventType {
 					tags := make([]string, 0)
 					for _, item := range typedEvent.Items {
@@ -86,7 +113,7 @@ func (f *Funnel) ProcessEvent(evt interface{}) {
 						Tags:      tags,
 					})
 				}
-			case EnterCheckoutEvent:
+			case *EnterCheckoutEvent:
 				tags := make([]string, 0)
 				for _, item := range typedEvent.Items {
 					tags = append(tags, fmt.Sprintf("%d", item.Id))
@@ -98,7 +125,7 @@ func (f *Funnel) ProcessEvent(evt interface{}) {
 						Tags:      tags,
 					})
 				}
-			case CartEvent:
+			case *CartEvent:
 				if FUNNEL_EVENT_CART_ADD == filter.EventType {
 					step.AddEvent(FunnelEvent{
 						SessionId: typedEvent.SessionId,
@@ -107,14 +134,14 @@ func (f *Funnel) ProcessEvent(evt interface{}) {
 					})
 				}
 
-			case SearchEventData:
+			case *SearchEvent:
 				if FUNNEL_EVENT_SEARCH == filter.EventType {
 					step.AddEvent(FunnelEvent{
 						SessionId: typedEvent.SessionId,
 						TimeStamp: typedEvent.TimeStamp,
 					})
 				}
-			case ActionEvent:
+			case *ActionEvent:
 				if FUNNEL_EVENT_ACTION == filter.EventType {
 					step.AddEvent(FunnelEvent{
 						SessionId: typedEvent.SessionId,
@@ -123,14 +150,14 @@ func (f *Funnel) ProcessEvent(evt interface{}) {
 					})
 				}
 
-			case SuggestEvent:
+			case *SuggestEvent:
 				if FUNNEL_EVENT_SUGGEST == filter.EventType {
 					step.AddEvent(FunnelEvent{
 						SessionId: typedEvent.SessionId,
 						TimeStamp: typedEvent.TimeStamp,
 					})
 				}
-			case PurchaseEvent:
+			case *PurchaseEvent:
 				if FUNNEL_EVENT_PURCHASE == filter.EventType {
 					tags := make([]string, 0)
 					for _, item := range typedEvent.Items {

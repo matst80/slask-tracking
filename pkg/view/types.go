@@ -1,6 +1,7 @@
 package view
 
 import (
+	"strings"
 	"time"
 
 	"github.com/matst80/slask-finder/pkg/index"
@@ -82,7 +83,7 @@ type PurchaseEvent struct {
 	//Referer string     `json:"referer,omitempty"`
 }
 
-type SearchEventData struct {
+type SearchEvent struct {
 	*BaseEvent
 	*types.Filters
 	NumberOfResults int    `json:"noi"`
@@ -124,6 +125,18 @@ type SuggestEvent struct {
 	//Referer     string `json:"referer,omitempty"`
 }
 
+func (e *Event) GetType() uint16 {
+	return e.Event
+}
+
+func (e *SuggestEvent) GetType() uint16 {
+	return e.Event
+}
+
+func (e *SearchEvent) GetType() uint16 {
+	return e.Event
+}
+
 func (e *Session) GetType() uint16 {
 	return e.Event
 }
@@ -144,6 +157,84 @@ func (e *PurchaseEvent) GetType() uint16 {
 	return e.Event
 }
 
+func (e *EnterCheckoutEvent) GetType() uint16 {
+	return e.Event
+}
+
+func (e *Event) GetBaseEvent() *BaseEvent {
+	return e.BaseEvent
+}
+
+func (e *SuggestEvent) GetBaseEvent() *BaseEvent {
+	return e.BaseEvent
+}
+
+func (e *SearchEvent) GetBaseEvent() *BaseEvent {
+	return e.BaseEvent
+}
+
+func (e *Session) GetBaseEvent() *BaseEvent {
+	return e.BaseEvent
+}
+
+func (e *ActionEvent) GetBaseEvent() *BaseEvent {
+	return e.BaseEvent
+}
+
+func (e *CartEvent) GetBaseEvent() *BaseEvent {
+	return e.BaseEvent
+}
+
+func (e *ImpressionEvent) GetBaseEvent() *BaseEvent {
+	return e.BaseEvent
+}
+
+func (e *PurchaseEvent) GetBaseEvent() *BaseEvent {
+	return e.BaseEvent
+}
+
+func (e *EnterCheckoutEvent) GetBaseEvent() *BaseEvent {
+	return e.BaseEvent
+}
+
+func (e *Event) GetTags() []string {
+	return []string{}
+}
+
+func (e *SuggestEvent) GetTags() []string {
+	return strings.Split(e.Value, " ")
+}
+
+func (e *SearchEvent) GetTags() []string {
+	return []string{}
+}
+
+func (e *Session) GetTags() []string {
+	return []string{}
+}
+
+func (e *ActionEvent) GetTags() []string {
+	return []string{}
+}
+
+func (e *CartEvent) GetTags() []string {
+	return []string{}
+}
+
+func (e *ImpressionEvent) GetTags() []string {
+	return []string{}
+}
+
+func (e *PurchaseEvent) GetTags() []string {
+	return []string{}
+}
+
+func (e *EnterCheckoutEvent) GetTags() []string {
+	return []string{}
+}
+
 type TrackingEvent interface {
 	GetType() uint16
+	GetBaseEvent() *BaseEvent
+	GetTags() []string
 }
