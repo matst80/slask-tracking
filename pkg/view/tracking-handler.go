@@ -540,6 +540,7 @@ func (s *PersistentMemoryTrackingHandler) UpdateSessionFromRequest(sessionId int
 
 func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEvent, r *http.Request) {
 	if event.NumberOfResults == 0 {
+		log.Printf("Search event with no results %+v", event)
 		return
 	}
 	s.mu.Lock()
@@ -564,7 +565,7 @@ func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEvent, r
 			}
 			queryEvents.Popularity.Add(DecayEvent{
 				TimeStamp: ts,
-				Value:     50.0 + (float64(event.NumberOfResults) * 0.5),
+				Value:     20.0 + (float64(event.NumberOfResults) * 0.5),
 			})
 			//queryEvents.Popularity.Decay(ts)
 			for _, filter := range event.Filters.StringFilter {
@@ -580,48 +581,49 @@ func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEvent, r
 				}
 			}
 		}
-	}
+	} else {
 
-	for _, filter := range event.Filters.StringFilter {
-		s.FieldEvents.Add(filter.Id, DecayEvent{
-			TimeStamp: ts,
-			Value:     6,
-		})
 		for _, filter := range event.Filters.StringFilter {
-			fieldValues, ok := s.FieldValueEvents[filter.Id]
-			if !ok {
-				fieldValues = make(map[string]*DecayPopularity)
-				s.FieldValueEvents[filter.Id] = fieldValues
-			}
-			addFieldValueEvent := func(value string) {
-				fieldPopularity, ok := fieldValues[value]
+			s.FieldEvents.Add(filter.Id, DecayEvent{
+				TimeStamp: ts,
+				Value:     20.0 + (float64(event.NumberOfResults) * 0.5),
+			})
+			for _, filter := range event.Filters.StringFilter {
+				fieldValues, ok := s.FieldValueEvents[filter.Id]
 				if !ok {
-					fieldPopularity = &DecayPopularity{}
-					fieldValues[value] = fieldPopularity
+					fieldValues = make(map[string]*DecayPopularity)
+					s.FieldValueEvents[filter.Id] = fieldValues
 				}
-				fieldPopularity.Add(DecayEvent{
-					TimeStamp: ts,
-					Value:     80,
-				})
-			}
-			switch v := filter.Value.(type) {
-			case string:
-				addFieldValueEvent(v)
-			case []string:
-				for _, value := range v {
-					addFieldValueEvent(value)
+				addFieldValueEvent := func(value string) {
+					fieldPopularity, ok := fieldValues[value]
+					if !ok {
+						fieldPopularity = &DecayPopularity{}
+						fieldValues[value] = fieldPopularity
+					}
+					fieldPopularity.Add(DecayEvent{
+						TimeStamp: ts,
+						Value:     80,
+					})
 				}
-			default:
-				log.Printf("Unknown type %T for filter %d", filter.Value, filter.Id)
-			}
+				switch v := filter.Value.(type) {
+				case string:
+					addFieldValueEvent(v)
+				case []string:
+					for _, value := range v {
+						addFieldValueEvent(value)
+					}
+				default:
+					log.Printf("Unknown type %T for filter %d", filter.Value, filter.Id)
+				}
 
+			}
 		}
-	}
-	for _, filter := range event.Filters.RangeFilter {
-		s.FieldEvents.Add(filter.Id, DecayEvent{
-			TimeStamp: ts,
-			Value:     3,
-		})
+		for _, filter := range event.Filters.RangeFilter {
+			s.FieldEvents.Add(filter.Id, DecayEvent{
+				TimeStamp: ts,
+				Value:     30,
+			})
+		}
 	}
 
 	go s.handleFunnels(&event)
