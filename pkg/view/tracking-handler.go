@@ -65,7 +65,7 @@ type QueryMatcher struct {
 }
 
 func (q *QueryMatcher) AddKeyFilterEvent(key uint, value string) {
-
+	ts := time.Now().Unix()
 	popularity, ok := q.KeyFields[key]
 	if !ok {
 		popularity = QueryKeyData{
@@ -75,7 +75,7 @@ func (q *QueryMatcher) AddKeyFilterEvent(key uint, value string) {
 		q.KeyFields[key] = popularity
 	}
 	popularity.FieldPopularity.Add(DecayEvent{
-		TimeStamp: time.Now().Unix(),
+		TimeStamp: ts,
 		Value:     100,
 	})
 	if value != "" {
@@ -85,7 +85,7 @@ func (q *QueryMatcher) AddKeyFilterEvent(key uint, value string) {
 			popularity.ValuePopularity[value] = valuePopularity
 		}
 		valuePopularity.Add(DecayEvent{
-			TimeStamp: time.Now().Unix(),
+			TimeStamp: ts,
 			Value:     100,
 		})
 	}

@@ -10,7 +10,7 @@ import (
 
 func (session *SessionData) DecayEvents(trk PopularityListener) {
 	ts := time.Now().Unix()
-	now := ts / 60
+	now := ts
 
 	session.LastSync = ts
 	sf := len(session.FieldEvents)
