@@ -149,7 +149,37 @@ func (s *PersistentMemoryTrackingHandler) cleanSessions() {
 			delete(s.Sessions, key)
 		}
 	}
+}
 
+func (s *PersistentMemoryTrackingHandler) DecayFacetValuesEvents() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now().Unix()
+
+	result := map[uint][]FacetValueResult{}
+
+	for facetId, facet := range s.FieldValueEvents {
+		valueResult := make([]FacetValueResult, 0)
+		score := 0.0
+		for value, field := range facet {
+			field.Decay(now)
+			if field.Value > 0.0002 {
+				valueResult = append(valueResult, FacetValueResult{
+					Value: value,
+					Score: field.Value,
+				})
+				score += field.Value
+			}
+		}
+		slices.SortFunc(valueResult, byValueScore)
+		result[facetId] = valueResult
+
+		maps.DeleteFunc(facet, func(key string, value *DecayPopularity) bool {
+			return value.Value < 0.0002
+		})
+	}
+	s.FieldValueScores = result
+	log.Printf("Decayed field events %d", len(s.FieldEvents))
 }
 
 func (s *PersistentMemoryTrackingHandler) DecaySessionEvents() {

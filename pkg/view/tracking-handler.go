@@ -98,6 +98,7 @@ type PersistentMemoryTrackingHandler struct {
 	changes          uint
 	updatesToKeep    int
 	trackingHandler  PopularityListener
+	FieldValueScores map[uint][]FacetValueResult          `json:"field_value_scores"`
 	ItemPopularity   index.SortOverride                   `json:"item_popularity"`
 	Queries          map[string]uint                      `json:"queries"`
 	QueryEvents      map[string]QueryMatcher              `json:"suggestions"`
@@ -440,7 +441,7 @@ func (s *PersistentMemoryTrackingHandler) GetFieldPopularity() index.SortOverrid
 func (s *PersistentMemoryTrackingHandler) GetFieldValuePopularity(id uint) interface{} {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	values, ok := s.FieldValueEvents[id]
+	values, ok := s.FieldValueScores[id]
 	if !ok {
 		return nil
 	}
