@@ -473,7 +473,7 @@ func (s *PersistentMemoryTrackingHandler) HandleEvent(event Event, r *http.Reque
 	defer s.mu.Unlock()
 	s.ItemEvents.Add(event.Item, DecayEvent{
 		TimeStamp: time.Now().Unix(),
-		Value:     40,
+		Value:     40.0 * float64(event.Position),
 	})
 
 	go s.handleFunnels(&event)
@@ -586,7 +586,7 @@ func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEvent, r
 		for _, filter := range event.Filters.StringFilter {
 			s.FieldEvents.Add(filter.Id, DecayEvent{
 				TimeStamp: ts,
-				Value:     20.0 + (float64(event.NumberOfResults) * 0.5),
+				Value:     40.0,
 			})
 			for _, filter := range event.Filters.StringFilter {
 				fieldValues, ok := s.FieldValueEvents[filter.Id]
@@ -664,7 +664,11 @@ func (s *PersistentMemoryTrackingHandler) HandleImpressionEvent(event Impression
 	defer s.mu.Unlock()
 	go opsProcessed.Inc()
 	for _, impression := range event.Items {
-		s.ItemPopularity[impression.Id] += 0.01 + float64(impression.Position)/1000
+		s.ItemEvents.Add(impression.Id, DecayEvent{
+			TimeStamp: time.Now().Unix(),
+			Value:     float64(impression.Position),
+		})
+		//s.ItemPopularity[impression.Id] += 5.01 + float64(impression.Position)/10
 	}
 	s.updateSession(event, event.SessionId, r)
 	go s.handleFunnels(&event)
@@ -676,6 +680,12 @@ func (s *PersistentMemoryTrackingHandler) HandleActionEvent(event ActionEvent, r
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	go opsProcessed.Inc()
+	if event.Item > 0 {
+		s.ItemEvents.Add(event.Item, DecayEvent{
+			TimeStamp: time.Now().Unix(),
+			Value:     30,
+		})
+	}
 	s.updateSession(event, event.SessionId, r)
 	go s.handleFunnels(&event)
 	s.changes++

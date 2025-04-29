@@ -54,26 +54,27 @@ type FunnelEvent struct {
 
 func (s *FunnelStep) AddEvent(evt FunnelEvent) {
 	s.Events = append(s.Events, evt)
-	log.Printf("[funnel] Added event to step %s", s.Name)
+	//log.Printf("[funnel] Added event to step %s", s.Name)
 }
 
 func (s *FunnelStep) ClearEvents() {
 	s.Events = []FunnelEvent{}
 }
 
-func (s *FunnelStep) Handle(base *BaseEvent, tags []string) {
+func (s *FunnelStep) ShouldHandle(base *BaseEvent, tags []string) bool {
 	if s.Sessions == nil {
 		s.Sessions = make(map[int]int)
 	}
 	if s.SessionUnique && base.SessionId == 0 {
-		return
+		return false
 	}
 	if s.SessionUnique {
 		if _, ok := s.Sessions[base.SessionId]; ok {
 			s.Sessions[base.SessionId]++
-			return
+			return false
 		}
 	}
+	return true
 }
 
 func (f *Funnel) ProcessEvent(evt TrackingEvent) {
@@ -85,15 +86,11 @@ func (f *Funnel) ProcessEvent(evt TrackingEvent) {
 			if filter.EventType == 0 {
 				continue
 			}
-			step.Handle(base, tags)
+			if !step.ShouldHandle(base, tags) {
+				continue
+			}
 			switch typedEvent := evt.(type) {
 			case *Event:
-				if step.SessionUnique {
-					if _, ok := step.Sessions[typedEvent.SessionId]; ok {
-						step.Sessions[typedEvent.SessionId]++
-						continue
-					}
-				}
 				if FUNNEL_EVENT_ITEM_EVENT == filter.EventType {
 					step.AddEvent(FunnelEvent{
 						SessionId: typedEvent.SessionId,
