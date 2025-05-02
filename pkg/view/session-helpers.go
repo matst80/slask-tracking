@@ -31,6 +31,7 @@ func (session *SessionData) DecayEvents(trk PopularityListener) {
 		if len(session.ItemPopularity) > 0 {
 			if err := trk.SessionPopularityChanged(session.Id, &session.ItemPopularity); err != nil {
 				log.Println(err)
+			} else {
 				log.Printf("Sending session item events %d", len(session.ItemPopularity))
 			}
 		}

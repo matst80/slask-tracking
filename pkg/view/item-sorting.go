@@ -73,9 +73,6 @@ func (s *SortOverrideStorage) SessionPopularityChanged(sessionId int, sort *inde
 		return err
 	}
 	_, err = s.client.Publish(s.ctx, REDIS_SESSION_POPULAR_CHANGE, id).Result()
-	if err != nil {
-		log.Printf("Error publishing session popularity change: %v", err)
-	}
 	return err
 }
 
