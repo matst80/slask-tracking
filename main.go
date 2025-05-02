@@ -85,7 +85,10 @@ func run_application() int {
 	mux.HandleFunc("GET /tracking/field-popularity", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		return viewHandler.GetFieldPopularity(), nil
 	}))
-
+	mux.HandleFunc("GET /tracking/clear", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+		viewHandler.Clear()
+		return true, nil
+	}))
 	mux.HandleFunc("GET /tracking/field-popularity/{id}", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		idString := r.PathValue("id")
 		id, err := strconv.Atoi(idString)
