@@ -310,8 +310,9 @@ func (s *PersistentMemoryTrackingHandler) Save() {
 func (s *PersistentMemoryTrackingHandler) save() error {
 	s.DecaySuggestions()
 	s.DecayEvents()
-	s.cleanSessions()
+
 	s.DecaySessionEvents()
+	s.cleanSessions()
 	s.DecayFacetValuesEvents()
 
 	defer runtime.GC()
