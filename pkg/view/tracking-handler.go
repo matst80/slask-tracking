@@ -137,8 +137,8 @@ func (session *SessionData) HandleEvent(event interface{}) {
 	if session.FieldEvents == nil {
 		session.FieldEvents = make(map[uint][]DecayEvent)
 	}
-	start := max(0, len(session.Events)-eventLimit)
-	session.Events = append(session.Events[start:], event)
+	//start := max(0, len(session.Events)-eventLimit)
+	//session.Events = append(session.Events[start:], event)
 	ts := time.Now().Unix()
 	now := ts
 
@@ -169,7 +169,7 @@ func (session *SessionData) HandleEvent(event interface{}) {
 		for _, impression := range e.Items {
 			session.ItemEvents.Add(impression.Id, DecayEvent{
 				TimeStamp: now,
-				Value:     0.5 * float64(impression.Position),
+				Value:     0.02 * float64(max(impression.Position, 300)),
 			})
 		}
 
@@ -491,7 +491,7 @@ func (s *PersistentMemoryTrackingHandler) HandleEvent(event Event, r *http.Reque
 	defer s.mu.Unlock()
 	s.ItemEvents.Add(event.Item, DecayEvent{
 		TimeStamp: time.Now().Unix(),
-		Value:     40.0 + (0.1 * float64(min(event.Position, 300))),
+		Value:     200.0 + (0.1 * float64(min(event.Position, 300))),
 	})
 
 	go s.handleFunnels(&event)

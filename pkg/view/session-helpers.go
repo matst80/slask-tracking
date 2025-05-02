@@ -143,12 +143,15 @@ func (s *PersistentMemoryTrackingHandler) cleanSessions() {
 	log.Println("Cleaning sessions")
 	tm := time.Now()
 	limit := tm.Unix() - 60*60*24*7
-	for key, item := range s.Sessions {
-		if limit > item.LastUpdate {
-			log.Printf("Deleting session %d", key)
-			delete(s.Sessions, key)
-		}
-	}
+	maps.DeleteFunc(s.Sessions, func(key int, value *SessionData) bool {
+		return value.LastUpdate < limit
+	})
+	// for key, item := range s.Sessions {
+	// 	if limit > item.LastUpdate {
+	// 		log.Printf("Deleting session %d", key)
+	// 		delete(s.Sessions, key)
+	// 	}
+	// }
 }
 
 func (s *PersistentMemoryTrackingHandler) DecayFacetValuesEvents() {

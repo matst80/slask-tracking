@@ -36,6 +36,7 @@ func (d *DecayEvent) CalculateValue(now int64) float64 {
 
 func (d *DecayEvent) Decay(now int64) float64 {
 	v := d.CalculateValue(now)
+
 	//if v < 0.1 {
 	//	d.TimeStamp = now
 	//	d.Value = v
@@ -96,21 +97,16 @@ func (d *DecayList) Decay(now int64) index.SortOverride {
 	result := index.SortOverride{}
 	var popularity float64
 	var event DecayEvent
-	toDelete := make([]uint, 0, len(*d))
+
 	for itemId, events := range *d {
 		popularity = 0
 		for _, event = range events {
 			popularity += event.Decay(now)
 		}
-		if popularity > 0.3 {
-			result[itemId] = popularity
-		} else {
-			toDelete = append(toDelete, itemId)
-		}
+
+		result[itemId] = popularity
 
 	}
-	for _, id := range toDelete {
-		delete(*d, id)
-	}
+
 	return result
 }
