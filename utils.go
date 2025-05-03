@@ -11,11 +11,11 @@ import (
 	"github.com/matst80/slask-tracking/pkg/view"
 )
 
-func generateSessionId() int {
-	return int(time.Now().UnixNano())
+func generateSessionId() int64 {
+	return time.Now().UnixNano()
 }
 
-func setSessionCookie(w http.ResponseWriter, r *http.Request, session_id int) {
+func setSessionCookie(w http.ResponseWriter, r *http.Request, session_id int64) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "sid",
 		Value:    fmt.Sprintf("%d", session_id),
@@ -28,7 +28,7 @@ func setSessionCookie(w http.ResponseWriter, r *http.Request, session_id int) {
 	})
 }
 
-func HandleSessionCookie(h view.TrackingHandler, w http.ResponseWriter, r *http.Request) int {
+func HandleSessionCookie(h view.TrackingHandler, w http.ResponseWriter, r *http.Request) int64 {
 	sessionId := generateSessionId()
 	c, err := r.Cookie("sid")
 	if err != nil {
@@ -43,7 +43,7 @@ func HandleSessionCookie(h view.TrackingHandler, w http.ResponseWriter, r *http.
 		setSessionCookie(w, r, sessionId)
 
 	} else {
-		sessionId, err = strconv.Atoi(c.Value)
+		sessionId, err = strconv.ParseInt(c.Value, 10, 64)
 		if err != nil {
 			setSessionCookie(w, r, sessionId)
 		}

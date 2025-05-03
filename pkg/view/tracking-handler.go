@@ -26,7 +26,7 @@ type TrackingHandler interface {
 	HandleImpressionEvent(event ImpressionEvent, r *http.Request)
 	HandleActionEvent(event ActionEvent, r *http.Request)
 	HandleSuggestEvent(event SuggestEvent, r *http.Request)
-	GetSession(sessionId int) *SessionData
+	GetSession(sessionId int64) *SessionData
 }
 
 // type UpdateHandler interface {
@@ -103,7 +103,7 @@ type PersistentMemoryTrackingHandler struct {
 	ItemPopularity        index.SortOverride                   `json:"item_popularity"`
 	Queries               map[string]uint                      `json:"queries"`
 	QueryEvents           map[string]QueryMatcher              `json:"suggestions"`
-	Sessions              map[int]*SessionData                 `json:"sessions"`
+	Sessions              map[int64]*SessionData               `json:"sessions"`
 	FieldPopularity       index.SortOverride                   `json:"field_popularity"`
 	ItemEvents            DecayList                            `json:"item_events"`
 	FieldEvents           DecayList                            `json:"field_events"`
@@ -128,7 +128,7 @@ type SessionData struct {
 	Variations      map[string]interface{} `json:"variations"`
 	ItemPopularity  index.SortOverride     `json:"item_popularity"`
 	FieldPopularity index.SortOverride     `json:"field_popularity"`
-	Id              int                    `json:"id"`
+	Id              int64                  `json:"id"`
 	Events          []interface{}          `json:"events"`
 	ItemEvents      DecayList              `json:"item_events"`
 	FieldEvents     DecayList              `json:"field_events"`
@@ -281,7 +281,7 @@ func MakeMemoryTrackingHandler(path string, itemsToKeep int) *PersistentMemoryTr
 			QueryEvents:      make(map[string]QueryMatcher),
 			ItemPopularity:   make(index.SortOverride),
 			Queries:          make(map[string]uint),
-			Sessions:         make(map[int]*SessionData),
+			Sessions:         make(map[int64]*SessionData),
 			FieldPopularity:  make(index.SortOverride),
 			ItemEvents:       map[uint][]DecayEvent{},
 			FieldEvents:      map[uint][]DecayEvent{},
@@ -312,7 +312,7 @@ func MakeMemoryTrackingHandler(path string, itemsToKeep int) *PersistentMemoryTr
 		instance.Queries = make(map[string]uint)
 	}
 	if instance.Sessions == nil {
-		instance.Sessions = make(map[int]*SessionData)
+		instance.Sessions = make(map[int64]*SessionData)
 	}
 	if instance.FieldPopularity == nil {
 		instance.FieldPopularity = make(index.SortOverride)
@@ -409,7 +409,7 @@ func (s *PersistentMemoryTrackingHandler) Clear() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.changes++
-	s.Sessions = make(map[int]*SessionData)
+	s.Sessions = make(map[int64]*SessionData)
 	//s.ItemPopularity = make(index.SortOverride)
 	//s.Queries = make(map[string]uint)
 	//s.QueryEvents = make(map[string]QueryMatcher)
@@ -422,7 +422,7 @@ func (s *PersistentMemoryTrackingHandler) Clear() {
 
 }
 
-func (s *PersistentMemoryTrackingHandler) GetSession(sessionId int) *SessionData {
+func (s *PersistentMemoryTrackingHandler) GetSession(sessionId int64) *SessionData {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	session, ok := s.Sessions[sessionId]
@@ -504,7 +504,7 @@ func (s *PersistentMemoryTrackingHandler) GetNoResultQueries() []SearchEvent {
 
 type SessionOverview struct {
 	*SessionContent
-	Id         int   `json:"id"`
+	Id         int64 `json:"id"`
 	Created    int64 `json:"ts"`
 	LastUpdate int64 `json:"last_update"`
 	LastSync   int64 `json:"last_sync"`
@@ -625,7 +625,7 @@ func normalizeQuery(query string) string {
 	return query
 }
 
-func (s *PersistentMemoryTrackingHandler) UpdateSessionFromRequest(sessionId int, r *http.Request) {
+func (s *PersistentMemoryTrackingHandler) UpdateSessionFromRequest(sessionId int64, r *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	session, ok := s.Sessions[sessionId]
@@ -742,7 +742,7 @@ func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEvent, r
 
 }
 
-func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessionId int, r *http.Request) {
+func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessionId int64, r *http.Request) {
 
 	session, ok := s.Sessions[sessionId]
 	now := time.Now().Unix()

@@ -65,7 +65,7 @@ func (s *SortOverrideStorage) FieldPopularityChanged(sort *index.SortOverride) e
 	return err
 }
 
-func (s *SortOverrideStorage) SessionPopularityChanged(sessionId int, sort *index.SortOverride) error {
+func (s *SortOverrideStorage) SessionPopularityChanged(sessionId int64, sort *index.SortOverride) error {
 	data := sort.ToString()
 	id := fmt.Sprintf("_item_%d", sessionId)
 	_, err := s.client.Set(s.ctx, id, data, 0).Result()
@@ -76,7 +76,7 @@ func (s *SortOverrideStorage) SessionPopularityChanged(sessionId int, sort *inde
 	return err
 }
 
-func (s *SortOverrideStorage) SessionFieldPopularityChanged(sessionId int, sort *index.SortOverride) error {
+func (s *SortOverrideStorage) SessionFieldPopularityChanged(sessionId int64, sort *index.SortOverride) error {
 	content := sort.ToString()
 	id := fmt.Sprintf("_field_%d", sessionId)
 	_, err := s.client.Set(s.ctx, id, content, 0).Result()

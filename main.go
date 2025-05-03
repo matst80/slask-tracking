@@ -85,7 +85,7 @@ func run_application() int {
 	}))
 	mux.HandleFunc("/tracking/session/{id}", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		id := r.PathValue("id")
-		sessionId, err := strconv.Atoi(id)
+		sessionId, err := strconv.ParseInt(id, 10, 64)
 		if err != nil {
 			return nil, err
 		}

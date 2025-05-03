@@ -27,7 +27,7 @@ const (
 
 type BaseEvent struct {
 	TimeStamp int64  `json:"ts,omitempty"`
-	SessionId int    `json:"session_id,omitempty"`
+	SessionId int64  `json:"session_id,omitempty"`
 	Event     uint16 `json:"event"`
 }
 
@@ -119,8 +119,8 @@ type SearchEvent struct {
 type PopularityListener interface {
 	PopularityChanged(sort *index.SortOverride) error
 	FieldPopularityChanged(sort *index.SortOverride) error
-	SessionPopularityChanged(sessionId int, sort *index.SortOverride) error
-	SessionFieldPopularityChanged(sessionId int, sort *index.SortOverride) error
+	SessionPopularityChanged(sessionId int64, sort *index.SortOverride) error
+	SessionFieldPopularityChanged(sessionId int64, sort *index.SortOverride) error
 }
 
 type Impression struct {

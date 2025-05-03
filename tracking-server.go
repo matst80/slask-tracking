@@ -11,7 +11,7 @@ import (
 	"github.com/matst80/slask-tracking/pkg/view"
 )
 
-func TrackHandler(trk view.TrackingHandler, handler func(r *http.Request, sessionId int, trackingHandler view.TrackingHandler) error) http.HandlerFunc {
+func TrackHandler(trk view.TrackingHandler, handler func(r *http.Request, sessionId int64, trackingHandler view.TrackingHandler) error) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "OPTIONS" {
 			w.Header().Set("Cache-Control", "public, max-age=3600")
@@ -41,7 +41,7 @@ func TrackHandler(trk view.TrackingHandler, handler func(r *http.Request, sessio
 	}
 }
 
-func TrackClick(r *http.Request, sessionId int, trk view.TrackingHandler) error {
+func TrackClick(r *http.Request, sessionId int64, trk view.TrackingHandler) error {
 	id := r.URL.Query().Get("id")
 	itemId, err := strconv.Atoi(id)
 	pos := r.URL.Query().Get("pos")
@@ -61,7 +61,7 @@ func TrackClick(r *http.Request, sessionId int, trk view.TrackingHandler) error 
 	return nil
 }
 
-func TrackPostClick(r *http.Request, sessionId int, trk view.TrackingHandler) error {
+func TrackPostClick(r *http.Request, sessionId int64, trk view.TrackingHandler) error {
 	clickData := &view.BaseItem{}
 	err := json.NewDecoder(r.Body).Decode(clickData)
 	if err != nil {
@@ -80,7 +80,7 @@ func TrackPostClick(r *http.Request, sessionId int, trk view.TrackingHandler) er
 	return nil
 }
 
-func TrackImpression(r *http.Request, sessionId int, trk view.TrackingHandler) error {
+func TrackImpression(r *http.Request, sessionId int64, trk view.TrackingHandler) error {
 
 	data := make([]view.BaseItem, 0)
 	err := json.NewDecoder(r.Body).Decode(&data)
@@ -108,7 +108,7 @@ type SuggestData struct {
 	Results     int    `json:"results"`
 }
 
-func TrackAction(r *http.Request, sessionId int, trk view.TrackingHandler) error {
+func TrackAction(r *http.Request, sessionId int64, trk view.TrackingHandler) error {
 
 	var data ActionData
 	err := json.NewDecoder(r.Body).Decode(&data)
@@ -127,7 +127,7 @@ func TrackAction(r *http.Request, sessionId int, trk view.TrackingHandler) error
 	return nil
 }
 
-func TrackSuggest(r *http.Request, sessionId int, trk view.TrackingHandler) error {
+func TrackSuggest(r *http.Request, sessionId int64, trk view.TrackingHandler) error {
 
 	var data SuggestData
 	err := json.NewDecoder(r.Body).Decode(&data)
@@ -168,7 +168,7 @@ type CheckoutData struct {
 	Items []view.BaseItem `json:"items"`
 }
 
-func TrackCheckout(r *http.Request, sessionId int, trk view.TrackingHandler) error {
+func TrackCheckout(r *http.Request, sessionId int64, trk view.TrackingHandler) error {
 
 	var data CheckoutData
 	err := json.NewDecoder(r.Body).Decode(&data)
@@ -186,7 +186,7 @@ func TrackCheckout(r *http.Request, sessionId int, trk view.TrackingHandler) err
 	return nil
 }
 
-func TrackCart(r *http.Request, sessionId int, trk view.TrackingHandler) error {
+func TrackCart(r *http.Request, sessionId int64, trk view.TrackingHandler) error {
 
 	var data CartData
 	err := json.NewDecoder(r.Body).Decode(&data)

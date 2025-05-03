@@ -13,7 +13,7 @@ type Funnel struct {
 type FunnelStep struct {
 	Name          string         `json:"name"`
 	SessionUnique bool           `json:"session_unique"`
-	Sessions      map[int]int    `json:"sessions,omitempty"`
+	Sessions      map[int64]int  `json:"sessions,omitempty"`
 	Filter        []FunnelFilter `json:"filter"`
 	Events        []FunnelEvent  `json:"events"`
 }
@@ -47,7 +47,7 @@ const (
 )
 
 type FunnelEvent struct {
-	SessionId int      `json:"session_id"`
+	SessionId int64    `json:"session_id"`
 	TimeStamp int64    `json:"ts,omitempty"`
 	Tags      []string `json:"tags,omitempty"`
 }
@@ -63,7 +63,7 @@ func (s *FunnelStep) ClearEvents() {
 
 func (s *FunnelStep) ShouldHandle(base *BaseEvent, tags []string) bool {
 	if s.Sessions == nil {
-		s.Sessions = make(map[int]int)
+		s.Sessions = make(map[int64]int)
 	}
 	if s.SessionUnique && base.SessionId == 0 {
 		return false
