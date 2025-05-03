@@ -202,13 +202,13 @@ var (
 		Name: "slasktracking_processed_tracking_events_total",
 		Help: "The total number of processed tracking events",
 	})
-	updatedProcessed = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "slasktracking_processed_update_events_total",
-		Help: "The total number of processed update events",
-	})
-	updatedItemsProcessed = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "slasktracking_processed_item_updates_total",
-		Help: "The total number of processed items updates",
+	// updatedProcessed = promauto.NewCounter(prometheus.CounterOpts{
+	// 	Name: "slasktracking_processed_update_events_total",
+	// 	Help: "The total number of processed update events",
+	// })
+	sessions_total = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "slasktracking_sessions_total",
+		Help: "The total number sessions",
 	})
 )
 
@@ -659,6 +659,7 @@ func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessi
 	session, ok := s.Sessions[sessionId]
 	now := time.Now().Unix()
 	if !ok {
+		sessions_total.Inc()
 		session = &SessionData{
 			SessionContent: &SessionContent{},
 			Created:        now,
