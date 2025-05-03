@@ -2,12 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/emicklei/go-restful/v3/log"
 	"github.com/matst80/slask-tracking/pkg/view"
 )
 
