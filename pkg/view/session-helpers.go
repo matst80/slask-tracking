@@ -140,7 +140,9 @@ func (s *PersistentMemoryTrackingHandler) DecaySuggestions() {
 func (s *PersistentMemoryTrackingHandler) cleanSessions() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
+	s.EmptyResults = slices.DeleteFunc(s.EmptyResults, func(i SearchEvent) bool {
+		return i.Query == ""
+	})
 	log.Println("Cleaning sessions")
 	tm := time.Now()
 	limit := tm.Unix() - 60*60*24*7
