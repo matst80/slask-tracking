@@ -89,7 +89,8 @@ func (d *DecayList) Add(key uint, value DecayEvent) {
 			value,
 		}
 	} else {
-		f = append(f, value)
+		//f = append(f, value)
+		(*d)[key] = append(f, value)
 	}
 }
 
