@@ -80,6 +80,9 @@ func run_application() int {
 		}
 		return viewHandler.GetFunnels()
 	}))
+	mux.HandleFunc("GET /tracking/item-events", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+		return viewHandler.GetItemEvents(), nil
+	}))
 	mux.HandleFunc("GET /tracking/popularity", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		return viewHandler.GetItemPopularity(), nil
 	}))
