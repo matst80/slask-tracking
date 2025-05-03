@@ -93,28 +93,37 @@ func (q *QueryMatcher) AddKeyFilterEvent(key uint, value string) {
 }
 
 type PersistentMemoryTrackingHandler struct {
-	path             string
-	mu               sync.RWMutex
-	changes          uint
-	updatesToKeep    int
-	trackingHandler  PopularityListener
-	FieldValueScores map[uint][]FacetValueResult          `json:"field_value_scores"`
-	ItemPopularity   index.SortOverride                   `json:"item_popularity"`
-	Queries          map[string]uint                      `json:"queries"`
-	QueryEvents      map[string]QueryMatcher              `json:"suggestions"`
-	Sessions         map[int]*SessionData                 `json:"sessions"`
-	FieldPopularity  index.SortOverride                   `json:"field_popularity"`
-	ItemEvents       DecayList                            `json:"item_events"`
-	FieldEvents      DecayList                            `json:"field_events"`
-	SortedQueries    []QueryResult                        `json:"sorted_queries"`
-	FieldValueEvents map[uint]map[string]*DecayPopularity `json:"field_value_events"`
-	Funnels          []Funnel                             `json:"funnel_storage"`
-	EmptyResults     []SearchEvent                        `json:"empty_results"`
+	path                  string
+	mu                    sync.RWMutex
+	changes               uint
+	updatesToKeep         int
+	trackingHandler       PopularityListener
+	FieldValueScores      map[uint][]FacetValueResult          `json:"field_value_scores"`
+	ItemPopularity        index.SortOverride                   `json:"item_popularity"`
+	Queries               map[string]uint                      `json:"queries"`
+	QueryEvents           map[string]QueryMatcher              `json:"suggestions"`
+	Sessions              map[int]*SessionData                 `json:"sessions"`
+	FieldPopularity       index.SortOverride                   `json:"field_popularity"`
+	ItemEvents            DecayList                            `json:"item_events"`
+	FieldEvents           DecayList                            `json:"field_events"`
+	SortedQueries         []QueryResult                        `json:"sorted_queries"`
+	FieldValueEvents      map[uint]map[string]*DecayPopularity `json:"field_value_events"`
+	Funnels               []Funnel                             `json:"funnel_storage"`
+	EmptyResults          []SearchEvent                        `json:"empty_results"`
+	PersonalizationGroups map[string]PersonalizationGroup      `json:"personalization_groups"`
 	//UpdatedItems    []interface{}        `json:"updated_items"`
+}
+
+type PersonalizationGroup struct {
+	Id          string    `json:"id"`
+	Name        string    `json:"name"`
+	ItemEvents  DecayList `json:"item_events"`
+	FieldEvents DecayList `json:"field_events"`
 }
 
 type SessionData struct {
 	*SessionContent
+	Groups          map[string]float64 `json:"groups"`
 	ItemPopularity  index.SortOverride `json:"item_popularity"`
 	FieldPopularity index.SortOverride `json:"field_popularity"`
 	Id              int                `json:"id"`
@@ -140,6 +149,9 @@ func (session *SessionData) HandleEvent(event interface{}) {
 	if session.Events == nil {
 		session.Events = make([]interface{}, 0)
 	}
+	if session.Groups == nil {
+		session.Groups = make(map[string]float64)
+	}
 	start := max(0, len(session.Events)-eventLimit)
 	session.Events = append(session.Events[start:], event)
 	ts := time.Now().Unix()
@@ -153,6 +165,13 @@ func (session *SessionData) HandleEvent(event interface{}) {
 				TimeStamp: now,
 				Value:     200,
 			})
+			if e.BaseItem.Category != "Gaming" {
+				session.Groups["gamer"] += 5
+			} else if e.BaseItem.Category3 == "TV" {
+				session.Groups["tv"] += 5
+			} else if e.BaseItem.Brand == "Apple" {
+				session.Groups["apple"] += 5
+			}
 		} else {
 			log.Printf("Event without item %+v", event)
 		}
