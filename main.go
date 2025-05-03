@@ -101,6 +101,9 @@ func run_application() int {
 	mux.HandleFunc("GET /tracking/queries", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		return viewHandler.GetQueries(), nil
 	}))
+	mux.HandleFunc("GET /tracking/no-results", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+		return viewHandler.GetNoResultQueries(), nil
+	}))
 	// mux.HandleFunc("/tracking/updated", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	// 	return viewHandler.GetUpdatedItems(), nil
 	// }))

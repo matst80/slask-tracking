@@ -442,6 +442,12 @@ func (s *PersistentMemoryTrackingHandler) GetQueries() map[string]uint {
 	return s.Queries
 }
 
+func (s *PersistentMemoryTrackingHandler) GetNoResultQueries() []SearchEvent {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.EmptyResults
+}
+
 func (s *PersistentMemoryTrackingHandler) GetSessions() []*SessionData {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
