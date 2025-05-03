@@ -137,8 +137,11 @@ func (session *SessionData) HandleEvent(event interface{}) {
 	if session.FieldEvents == nil {
 		session.FieldEvents = make(map[uint][]DecayEvent)
 	}
+	if session.Events == nil {
+		session.Events = make([]interface{}, 0)
+	}
 	//start := max(0, len(session.Events)-eventLimit)
-	//session.Events = append(session.Events[start:], event)
+	session.Events = append(session.Events, event)
 	ts := time.Now().Unix()
 	now := ts
 
@@ -661,14 +664,16 @@ func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessi
 	if !ok {
 		sessions_total.Inc()
 		session = &SessionData{
-			SessionContent: &SessionContent{},
-			Created:        now,
-			LastUpdate:     now,
-			LastSync:       0,
-			Id:             sessionId,
-			Events:         make([]interface{}, 0),
-			ItemEvents:     make(map[uint][]DecayEvent),
-			FieldEvents:    make(map[uint][]DecayEvent),
+			SessionContent:  GetSessionContentFromRequest(r),
+			Created:         now,
+			LastUpdate:      now,
+			LastSync:        0,
+			Id:              sessionId,
+			Events:          make([]interface{}, 1),
+			ItemEvents:      make(map[uint][]DecayEvent),
+			FieldEvents:     make(map[uint][]DecayEvent),
+			ItemPopularity:  make(index.SortOverride),
+			FieldPopularity: make(index.SortOverride),
 		}
 		s.Sessions[sessionId] = session
 	} else {

@@ -103,10 +103,16 @@ func (d *DecayList) Decay(now int64) index.SortOverride {
 		for _, event = range events {
 			popularity += event.Decay(now)
 		}
-
+		if popularity < 0.002 {
+			continue
+		}
 		result[itemId] = popularity
 
 	}
+	// *d = slices.DeleteFunc(d, func(i DecayEvent) bool {
+	// 	// log.Printf("Deleting value popularity %s for query %s, value:%f", key, q, value.Value)
+	// 	return i.Value < 0.0002
+	// })
 
 	return result
 }
