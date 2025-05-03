@@ -624,6 +624,12 @@ func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEvent, r
 					for _, value := range v {
 						queryEvents.AddKeyFilterEvent(filter.Id, value)
 					}
+				case []interface{}:
+					for _, value := range v {
+						if strValue, ok := value.(string); ok {
+							queryEvents.AddKeyFilterEvent(filter.Id, strValue)
+						}
+					}
 				default:
 					log.Printf("Unknown type %T for filter %d", filter.Value, filter.Id)
 				}
