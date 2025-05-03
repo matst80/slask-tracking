@@ -165,12 +165,12 @@ func (session *SessionData) HandleEvent(event interface{}) {
 				TimeStamp: now,
 				Value:     200,
 			})
-			if e.BaseItem.Category != "Gaming" {
+			if e.BaseItem.Category == "Gaming" {
 				session.Groups["gamer"] += 5
 			} else if e.BaseItem.Category3 == "TV" {
 				session.Groups["tv"] += 5
 			} else if e.BaseItem.Brand == "Apple" {
-				session.Groups["apple"] += 5
+				session.Groups["apple"] += 3
 			}
 		} else {
 			log.Printf("Event without item %+v", event)
