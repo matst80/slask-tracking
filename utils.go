@@ -71,8 +71,10 @@ func JsonHandler(handler func(w http.ResponseWriter, r *http.Request) (interface
 			w.Header().Set("Access-Control-Allow-Headers", "*")
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 		}
-		w.Header().Set("Age", "0")
-		w.Header().Set("Cache-Control", "private, stale-while-revalidate=10")
+		if r.Method == http.MethodGet {
+			w.Header().Set("Age", "0")
+			w.Header().Set("Cache-Control", "public, stale-while-revalidate=60")
+		}
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(result)
 	}
