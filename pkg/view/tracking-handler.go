@@ -3,6 +3,7 @@ package view
 import (
 	"encoding/json"
 	"log"
+	"math/rand/v2"
 	"net/http"
 	"os"
 	"runtime"
@@ -123,16 +124,31 @@ type PersonalizationGroup struct {
 
 type SessionData struct {
 	*SessionContent
-	Groups          map[string]float64 `json:"groups"`
-	ItemPopularity  index.SortOverride `json:"item_popularity"`
-	FieldPopularity index.SortOverride `json:"field_popularity"`
-	Id              int                `json:"id"`
-	Events          []interface{}      `json:"events"`
-	ItemEvents      DecayList          `json:"item_events"`
-	FieldEvents     DecayList          `json:"field_events"`
-	Created         int64              `json:"ts"`
-	LastUpdate      int64              `json:"last_update"`
-	LastSync        int64              `json:"last_sync"`
+	Groups          map[string]float64     `json:"groups"`
+	Variations      map[string]interface{} `json:"variations"`
+	ItemPopularity  index.SortOverride     `json:"item_popularity"`
+	FieldPopularity index.SortOverride     `json:"field_popularity"`
+	Id              int                    `json:"id"`
+	Events          []interface{}          `json:"events"`
+	ItemEvents      DecayList              `json:"item_events"`
+	FieldEvents     DecayList              `json:"field_events"`
+	Created         int64                  `json:"ts"`
+	LastUpdate      int64                  `json:"last_update"`
+	LastSync        int64                  `json:"last_sync"`
+}
+
+func (session *SessionData) HandleVariation(id string) (interface{}, error) {
+	if session.Variations == nil {
+		session.Variations = make(map[string]interface{})
+	}
+	if v, ok := session.Variations[id]; ok {
+		return v, nil
+	}
+
+	v := rand.Int()
+	session.Variations[id] = v
+	return v, nil
+
 }
 
 const (

@@ -43,6 +43,16 @@ func run_application() int {
 		viewHandler.Save()
 		w.WriteHeader(http.StatusAccepted)
 	})
+	mux.HandleFunc("/tracking/variation/{id}", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+		id := r.PathValue("id")
+		sessionId := HandleSessionCookie(viewHandler, w, r)
+		session := viewHandler.GetSession(sessionId)
+		if session == nil {
+			return nil, nil
+		}
+		return session.HandleVariation(id)
+	}))
+
 	mux.HandleFunc("/tracking/my/groups", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		sessionId := HandleSessionCookie(viewHandler, w, r)
 		session := viewHandler.GetSession(sessionId)
