@@ -517,6 +517,7 @@ func (s *PersistentMemoryTrackingHandler) GetSessions() []SessionOverview {
 	i := 0
 	for id, session := range s.Sessions {
 		if len(session.Events) > 1 {
+			session.Id = id
 			sessions[i] = SessionOverview{
 				SessionContent: session.SessionContent,
 				Id:             id,
