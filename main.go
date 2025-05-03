@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/matst80/slask-tracking/pkg/events"
 	"github.com/matst80/slask-tracking/pkg/view"
@@ -48,6 +49,24 @@ func run_application() int {
 		if session == nil {
 			return nil, nil
 		}
+
+		groups := session.Groups
+		if len(groups) > 0 {
+			groupValues := make([]string, 0)
+			for id := range groups {
+				groupValues = append(groupValues, id)
+			}
+			http.SetCookie(w, &http.Cookie{
+				Name: "persona", Value: strings.Join(groupValues, ","),
+				HttpOnly: true,
+				Secure:   true,
+				SameSite: http.SameSiteNoneMode,
+				Domain:   strings.TrimPrefix(r.Host, "."),
+				MaxAge:   2592000000,
+				Path:     "/",
+			})
+		}
+
 		return session.Groups, nil
 	}))
 	mux.HandleFunc("/tracking/my/session", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
