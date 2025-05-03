@@ -572,8 +572,11 @@ func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEvent, r
 		if s.EmptyResults == nil {
 			s.EmptyResults = make([]SearchEvent, 0)
 		}
-		s.EmptyResults = append(s.EmptyResults, event)
-		log.Printf("Search event with no results %+v", event)
+		if event.Query != "" {
+			s.EmptyResults = append(s.EmptyResults, event)
+			log.Printf("Search event with no results %+v", event)
+		}
+
 		return
 	}
 	s.mu.Lock()
