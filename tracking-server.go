@@ -94,7 +94,7 @@ func TrackImpression(r *http.Request, sessionId int, trk view.TrackingHandler) e
 }
 
 type ActionData struct {
-	*view.BaseItem
+	Item *view.BaseItem `json:"item,omitempty"`
 	//Item   uint   `json:"item"`
 	Action string `json:"action"`
 	Reason string `json:"reason"`
@@ -116,7 +116,7 @@ func TrackAction(r *http.Request, sessionId int, trk view.TrackingHandler) error
 	referer := r.Header.Get("Referer")
 	go trk.HandleActionEvent(view.ActionEvent{
 		BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_ACTION, SessionId: sessionId, TimeStamp: time.Now().Unix()},
-		BaseItem:  data.BaseItem,
+		BaseItem:  data.Item,
 		Action:    data.Action,
 		Reason:    data.Reason,
 		Referer:   referer,

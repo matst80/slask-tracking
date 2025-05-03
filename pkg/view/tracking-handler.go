@@ -719,7 +719,7 @@ func (s *PersistentMemoryTrackingHandler) HandleActionEvent(event ActionEvent, r
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	go opsProcessed.Inc()
-	if event.Id > 0 {
+	if event.BaseItem != nil && event.Id > 0 {
 		s.ItemEvents.Add(event.Id, DecayEvent{
 			TimeStamp: time.Now().Unix(),
 			Value:     30,
