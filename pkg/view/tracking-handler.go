@@ -502,14 +502,28 @@ func (s *PersistentMemoryTrackingHandler) GetNoResultQueries() []SearchEvent {
 	return s.EmptyResults
 }
 
-func (s *PersistentMemoryTrackingHandler) GetSessions() []*SessionData {
+type SessionOverview struct {
+	*SessionContent
+	Id         int   `json:"id"`
+	Created    int64 `json:"ts"`
+	LastUpdate int64 `json:"last_update"`
+	LastSync   int64 `json:"last_sync"`
+}
+
+func (s *PersistentMemoryTrackingHandler) GetSessions() []SessionOverview {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	sessions := make([]*SessionData, len(s.Sessions))
+	sessions := make([]SessionOverview, len(s.Sessions))
 	i := 0
-	for _, session := range s.Sessions {
+	for id, session := range s.Sessions {
 		if len(session.Events) > 1 {
-			sessions[i] = session
+			sessions[i] = SessionOverview{
+				SessionContent: session.SessionContent,
+				Id:             id,
+				Created:        session.Created,
+				LastUpdate:     session.LastUpdate,
+				LastSync:       session.LastSync,
+			}
 			i++
 		}
 	}
