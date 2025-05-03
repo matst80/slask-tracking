@@ -357,7 +357,7 @@ func (s *PersistentMemoryTrackingHandler) Clear() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.changes++
-	//s.Sessions = make(map[int]*SessionData)
+	s.Sessions = make(map[int]*SessionData)
 	//s.ItemPopularity = make(index.SortOverride)
 	//s.Queries = make(map[string]uint)
 	//s.QueryEvents = make(map[string]QueryMatcher)
