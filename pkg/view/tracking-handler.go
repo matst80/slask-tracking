@@ -140,8 +140,8 @@ func (session *SessionData) HandleEvent(event interface{}) {
 	if session.Events == nil {
 		session.Events = make([]interface{}, 0)
 	}
-	//start := max(0, len(session.Events)-eventLimit)
-	session.Events = append(session.Events, event)
+	start := max(0, len(session.Events)-eventLimit)
+	session.Events = append(session.Events[start:], event)
 	ts := time.Now().Unix()
 	now := ts
 
@@ -152,15 +152,13 @@ func (session *SessionData) HandleEvent(event interface{}) {
 			TimeStamp: now,
 			Value:     200,
 		})
-
+		return
 	case SearchEvent:
-
 		for _, filter := range e.Filters.StringFilter {
 			session.FieldEvents.Add(filter.Id, DecayEvent{
 				TimeStamp: now,
 				Value:     150,
 			})
-
 		}
 		for _, filter := range e.Filters.RangeFilter {
 			session.FieldEvents.Add(filter.Id, DecayEvent{
@@ -168,6 +166,7 @@ func (session *SessionData) HandleEvent(event interface{}) {
 				Value:     100,
 			})
 		}
+		return
 	case ImpressionEvent:
 		for _, impression := range e.Items {
 			session.ItemEvents.Add(impression.Id, DecayEvent{
@@ -175,27 +174,29 @@ func (session *SessionData) HandleEvent(event interface{}) {
 				Value:     0.02 * float64(max(impression.Position, 300)),
 			})
 		}
-
+		return
 	case CartEvent:
 		session.ItemEvents.Add(e.Item, DecayEvent{
 			TimeStamp: now,
 			Value:     700,
 		})
-
+		return
 	case ActionEvent:
 		session.ItemEvents.Add(e.Item, DecayEvent{
 			TimeStamp: now,
 			Value:     80,
 		})
-
+		return
 	case PurchaseEvent:
 		for _, purchase := range e.Items {
 			session.ItemEvents.Add(purchase.Id, DecayEvent{
 				TimeStamp: now,
 				Value:     800 * float64(purchase.Quantity),
 			})
-
 		}
+		return
+	default:
+		log.Printf("Unknown event type %T", event)
 	}
 
 }
@@ -478,7 +479,7 @@ func (s *PersistentMemoryTrackingHandler) HandleSessionEvent(event Session) {
 	s.changes++
 	opsProcessed.Inc()
 
-	events := make([]interface{}, 0, 200)
+	events := make([]interface{}, 0)
 	s.Sessions[event.SessionId] = &SessionData{
 		SessionContent: &event.SessionContent,
 		Created:        time.Now().Unix(),
