@@ -51,8 +51,28 @@ func TrackClick(r *http.Request, sessionId int, trk view.TrackingHandler) error 
 
 	go trk.HandleEvent(view.Event{
 		BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_CLICK, SessionId: sessionId, TimeStamp: time.Now().Unix()},
-		Item:      uint(itemId),
-		Position:  float32(position) / 100.0,
+		BaseItem: &view.BaseItem{
+			Id:       uint(itemId),
+			Position: float32(position),
+		},
+		//Referer:   referer,
+	}, r)
+	return nil
+}
+
+func TrackPostClick(r *http.Request, sessionId int, trk view.TrackingHandler) error {
+	clickData := &view.BaseItem{}
+	err := json.NewDecoder(r.Body).Decode(clickData)
+	if err != nil {
+		return err
+	}
+
+	if clickData.Id == 0 {
+		return nil
+	}
+	go trk.HandleEvent(view.Event{
+		BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_CLICK, SessionId: sessionId, TimeStamp: time.Now().Unix()},
+		BaseItem:  clickData,
 		//Referer:   referer,
 	}, r)
 	return nil
@@ -60,7 +80,7 @@ func TrackClick(r *http.Request, sessionId int, trk view.TrackingHandler) error 
 
 func TrackImpression(r *http.Request, sessionId int, trk view.TrackingHandler) error {
 
-	data := make([]view.Impression, 0)
+	data := make([]view.BaseItem, 0)
 	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
 		return err
@@ -74,7 +94,8 @@ func TrackImpression(r *http.Request, sessionId int, trk view.TrackingHandler) e
 }
 
 type ActionData struct {
-	Item   uint   `json:"item"`
+	*view.BaseItem
+	//Item   uint   `json:"item"`
 	Action string `json:"action"`
 	Reason string `json:"reason"`
 }
@@ -95,7 +116,7 @@ func TrackAction(r *http.Request, sessionId int, trk view.TrackingHandler) error
 	referer := r.Header.Get("Referer")
 	go trk.HandleActionEvent(view.ActionEvent{
 		BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_ACTION, SessionId: sessionId, TimeStamp: time.Now().Unix()},
-		Item:      data.Item,
+		BaseItem:  data.BaseItem,
 		Action:    data.Action,
 		Reason:    data.Reason,
 		Referer:   referer,
@@ -124,9 +145,8 @@ func TrackSuggest(r *http.Request, sessionId int, trk view.TrackingHandler) erro
 }
 
 type CartData struct {
-	Type     string `json:"type"`
-	Item     uint   `json:"item"`
-	Quantity uint   `json:"quantity"`
+	*view.BaseItem
+	Type string `json:"type"`
 }
 
 func getCartEventType(cartType string) uint16 {
@@ -143,7 +163,7 @@ func getCartEventType(cartType string) uint16 {
 }
 
 type CheckoutData struct {
-	Items []view.Purchase `json:"items"`
+	Items []view.BaseItem `json:"items"`
 }
 
 func TrackCheckout(r *http.Request, sessionId int, trk view.TrackingHandler) error {
@@ -176,8 +196,7 @@ func TrackCart(r *http.Request, sessionId int, trk view.TrackingHandler) error {
 
 	go trk.HandleCartEvent(view.CartEvent{
 		BaseEvent: &view.BaseEvent{Event: eventType, SessionId: sessionId, TimeStamp: time.Now().Unix()},
-		Item:      data.Item,
-		Quantity:  data.Quantity,
+		BaseItem:  data.BaseItem,
 		Type:      data.Type,
 		//Referer:   referer,
 	}, r)

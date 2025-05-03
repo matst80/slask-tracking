@@ -148,7 +148,7 @@ func (session *SessionData) HandleEvent(event interface{}) {
 	session.LastUpdate = now
 	switch e := event.(type) {
 	case Event:
-		session.ItemEvents.Add(e.Item, DecayEvent{
+		session.ItemEvents.Add(e.Id, DecayEvent{
 			TimeStamp: now,
 			Value:     200,
 		})
@@ -176,13 +176,13 @@ func (session *SessionData) HandleEvent(event interface{}) {
 		}
 		return
 	case CartEvent:
-		session.ItemEvents.Add(e.Item, DecayEvent{
+		session.ItemEvents.Add(e.Id, DecayEvent{
 			TimeStamp: now,
 			Value:     700,
 		})
 		return
 	case ActionEvent:
-		session.ItemEvents.Add(e.Item, DecayEvent{
+		session.ItemEvents.Add(e.Id, DecayEvent{
 			TimeStamp: now,
 			Value:     80,
 		})
@@ -500,7 +500,7 @@ func (s *PersistentMemoryTrackingHandler) HandleEvent(event Event, r *http.Reque
 	// log.Printf("Event SessionId: %d, ItemId: %d, Position: %f", event.SessionId, event.Item, event.Position)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.ItemEvents.Add(event.Item, DecayEvent{
+	s.ItemEvents.Add(event.Id, DecayEvent{
 		TimeStamp: time.Now().Unix(),
 		Value:     200.0 + (0.1 * float64(min(event.Position, 300))),
 	})
@@ -540,7 +540,7 @@ func (s *PersistentMemoryTrackingHandler) HandleCartEvent(event CartEvent, r *ht
 	// log.Printf("Cart event SessionId: %d, ItemId: %d, Quantity: %d", event.SessionId, event.Item, event.Quantity)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.ItemEvents.Add(event.Item, DecayEvent{
+	s.ItemEvents.Add(event.Id, DecayEvent{
 		TimeStamp: time.Now().Unix(),
 		Value:     190.0 * float64(event.Quantity),
 	})
@@ -719,8 +719,8 @@ func (s *PersistentMemoryTrackingHandler) HandleActionEvent(event ActionEvent, r
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	go opsProcessed.Inc()
-	if event.Item > 0 {
-		s.ItemEvents.Add(event.Item, DecayEvent{
+	if event.Id > 0 {
+		s.ItemEvents.Add(event.Id, DecayEvent{
 			TimeStamp: time.Now().Unix(),
 			Value:     30,
 		})

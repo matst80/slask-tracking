@@ -50,25 +50,49 @@ type Session struct {
 	SessionContent
 }
 
+type BaseItem struct {
+	Id        uint    `json:"id"`
+	Position  float32 `json:"index"`
+	Category  string  `json:"item_category,omitempty"`
+	Category2 string  `json:"item_category2,omitempty"`
+	Category3 string  `json:"item_category3,omitempty"`
+	Category4 string  `json:"item_category4,omitempty"`
+	Category5 string  `json:"item_category5,omitempty"`
+	Brand     string  `json:"item_brand,omitempty"`
+	Name      string  `json:"item_name,omitempty"`
+	Price     float32 `json:"price,omitempty"`
+	Quantity  uint    `json:"quantity,omitempty"`
+}
+
+//   item_name: string;
+//   item_brand?: string;
+//   item_category?: string;
+//   item_category2?: string;
+//   item_category3?: string;
+//   item_category4?: string;
+//   item_category5?: string;
+//   item_list_id?: string;
+//   item_list_name?: string;
+//   index: number;
+//   price?: number;
+
 type Event struct {
 	*BaseEvent
-	Item     uint    `json:"item"`
-	Position float32 `json:"position"`
+	*BaseItem
 	//Referer  string  `json:"referer,omitempty"`
 }
 
 type EnterCheckoutEvent struct {
 	*BaseEvent
-	Items []Purchase `json:"items"`
+	Items []BaseItem `json:"items"`
 	//Referer  string  `json:"referer,omitempty"`
 }
 
 type CartEvent struct {
 	*BaseEvent
+	*BaseItem
+	Type string `json:"type"`
 
-	Type     string `json:"type"`
-	Item     uint   `json:"item"`
-	Quantity uint   `json:"quantity"`
 	//Referer  string `json:"referer,omitempty"`
 }
 
@@ -79,7 +103,7 @@ type Purchase struct {
 
 type PurchaseEvent struct {
 	*BaseEvent
-	Items []Purchase `json:"items"`
+	Items []BaseItem `json:"items"`
 	//Referer string     `json:"referer,omitempty"`
 }
 
@@ -106,12 +130,13 @@ type Impression struct {
 
 type ImpressionEvent struct {
 	*BaseEvent
-	Items []Impression `json:"items"`
+	Items []BaseItem `json:"items"`
 }
 
 type ActionEvent struct {
 	*BaseEvent
-	Item    uint   `json:"id"`
+	*BaseItem
+	//Item    uint   `json:"id"`
 	Action  string `json:"action"`
 	Reason  string `json:"reason"`
 	Referer string `json:"referer,omitempty"`

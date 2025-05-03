@@ -54,7 +54,8 @@ func run_application() int {
 		}
 		return viewHandler.GetSession(sessionId), nil
 	}))
-	mux.HandleFunc("/track/click", TrackHandler(viewHandler, TrackClick))
+	mux.HandleFunc("GET /track/click", TrackHandler(viewHandler, TrackClick))
+	mux.HandleFunc("POST /track/click", TrackHandler(viewHandler, TrackPostClick))
 	mux.HandleFunc("/track/impressions", TrackHandler(viewHandler, TrackImpression))
 	mux.HandleFunc("/track/action", TrackHandler(viewHandler, TrackAction))
 	mux.HandleFunc("/track/suggest", TrackHandler(viewHandler, TrackSuggest))
