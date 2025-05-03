@@ -182,10 +182,12 @@ func (session *SessionData) HandleEvent(event interface{}) {
 		})
 		return
 	case ActionEvent:
-		session.ItemEvents.Add(e.Id, DecayEvent{
-			TimeStamp: now,
-			Value:     80,
-		})
+		if e.BaseItem != nil && e.Id > 0 {
+			session.ItemEvents.Add(e.Id, DecayEvent{
+				TimeStamp: now,
+				Value:     80,
+			})
+		}
 		return
 	case PurchaseEvent:
 		for _, purchase := range e.Items {
