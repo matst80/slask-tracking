@@ -201,6 +201,8 @@ func (session *SessionData) HandleEvent(event interface{}) {
 			})
 		}
 		return
+	case SuggestEvent:
+		return
 	default:
 		log.Printf("Unknown event type %T", event)
 	}
