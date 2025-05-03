@@ -144,10 +144,15 @@ func (session *SessionData) HandleVariation(id string) (interface{}, error) {
 	if v, ok := session.Variations[id]; ok {
 		return v, nil
 	}
-
-	v := rand.Int()
-	session.Variations[id] = v
-	return v, nil
+	var ret interface{}
+	v := rand.IntN(100)
+	if v < 50 {
+		ret = "a"
+	} else {
+		ret = "b"
+	}
+	session.Variations[id] = ret
+	return ret, nil
 
 }
 
