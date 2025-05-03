@@ -148,10 +148,14 @@ func (session *SessionData) HandleEvent(event interface{}) {
 	session.LastUpdate = now
 	switch e := event.(type) {
 	case Event:
-		session.ItemEvents.Add(e.Id, DecayEvent{
-			TimeStamp: now,
-			Value:     200,
-		})
+		if e.BaseItem != nil && e.Id > 0 {
+			session.ItemEvents.Add(e.Id, DecayEvent{
+				TimeStamp: now,
+				Value:     200,
+			})
+		} else {
+			log.Printf("Event without item %+v", event)
+		}
 		return
 	case SearchEvent:
 		for _, filter := range e.Filters.StringFilter {
@@ -410,6 +414,12 @@ func (s *PersistentMemoryTrackingHandler) SetFunnels(funnels []Funnel) error {
 	s.changes++
 	s.Funnels = funnels
 	return nil
+}
+
+func (s *PersistentMemoryTrackingHandler) GetItemEvents() DecayList {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.ItemEvents
 }
 
 func (s *PersistentMemoryTrackingHandler) GetItemPopularity() map[uint]float64 {

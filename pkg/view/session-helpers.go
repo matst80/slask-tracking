@@ -144,8 +144,8 @@ func (s *PersistentMemoryTrackingHandler) cleanSessions() {
 		return i.Query == ""
 	})
 	log.Println("Cleaning sessions")
-	tm := time.Now()
-	limit := tm.Unix() - 60*60*24*7
+
+	limit := time.Now().Unix() - 60*60*24*7
 	maps.DeleteFunc(s.Sessions, func(key int, value *SessionData) bool {
 		return value.LastUpdate < limit
 	})

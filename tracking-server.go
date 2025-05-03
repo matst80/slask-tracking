@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/emicklei/go-restful/v3/log"
 	"github.com/matst80/slask-tracking/pkg/view"
 )
 
@@ -68,6 +69,7 @@ func TrackPostClick(r *http.Request, sessionId int, trk view.TrackingHandler) er
 	}
 
 	if clickData.Id == 0 {
+		log.Printf("Click data is empty")
 		return nil
 	}
 	go trk.HandleEvent(view.Event{
