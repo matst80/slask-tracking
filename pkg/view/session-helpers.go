@@ -174,6 +174,9 @@ func (s *PersistentMemoryTrackingHandler) cleanSessions() {
 		return i.Query == ""
 	})
 	for id, session := range s.Sessions {
+		session.Events = slices.DeleteFunc(session.Events, func(i interface{}) bool {
+			return i == nil
+		})
 		if session.Id != id {
 			session.Id = id
 		}
@@ -182,6 +185,12 @@ func (s *PersistentMemoryTrackingHandler) cleanSessions() {
 
 	limit := time.Now().Unix() - 60*60*24*7
 	maps.DeleteFunc(s.Sessions, func(key int64, value *SessionData) bool {
+		if len(value.Events) < 1 {
+			return true
+		}
+		if value.UserAgent == "" && value.Ip == "" {
+			return true
+		}
 		return value.LastUpdate < limit
 	})
 	// for key, item := range s.Sessions {

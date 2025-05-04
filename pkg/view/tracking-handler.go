@@ -157,8 +157,7 @@ func (session *SessionData) HandleEvent(event interface{}) map[string]float64 {
 	if session.Groups == nil {
 		session.Groups = make(map[string]float64)
 	}
-	start := max(0, len(session.Events)-eventLimit)
-	session.Events = append(session.Events[start:], event)
+
 	ts := time.Now().Unix()
 	now := ts
 
