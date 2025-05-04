@@ -2,6 +2,7 @@ package view
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"math/rand/v2"
 	"net/http"
@@ -450,11 +451,11 @@ func (s *PersistentMemoryTrackingHandler) GetNoResultQueries() []SearchEvent {
 
 type SessionOverview struct {
 	*SessionContent
-	Id         int64 `json:"id"`
-	Created    int64 `json:"ts"`
-	LastUpdate int64 `json:"last_update"`
-	LastSync   int64 `json:"last_sync"`
-	Events     int   `json:"event_count"`
+	Id         string `json:"id"`
+	Created    int64  `json:"ts"`
+	LastUpdate int64  `json:"last_update"`
+	LastSync   int64  `json:"last_sync"`
+	Events     int    `json:"event_count"`
 }
 
 func (s *PersistentMemoryTrackingHandler) GetSessions() []SessionOverview {
@@ -468,7 +469,7 @@ func (s *PersistentMemoryTrackingHandler) GetSessions() []SessionOverview {
 			log.Printf("Session %d with %d events", id, len(session.Events))
 			sessions[i] = SessionOverview{
 				SessionContent: session.SessionContent,
-				Id:             id,
+				Id:             fmt.Sprintf("%d", id),
 				Created:        session.Created,
 				LastUpdate:     session.LastUpdate,
 				LastSync:       session.LastSync,
