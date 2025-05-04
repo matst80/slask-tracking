@@ -16,10 +16,10 @@ func (session *SessionData) DecayEvents(trk PopularityListener) {
 	sf := len(session.FieldEvents)
 	if sf > 0 {
 		//log.Printf("Decaying field events %d", sf)
-		session.FieldPopularity = session.FieldEvents.Decay(now)
+		fieldPopularity := session.FieldEvents.Decay(now)
 		//log.Printf("Session field popularity %d", len(session.FieldPopularity))
-		if len(session.FieldPopularity) > 0 {
-			if err := trk.SessionFieldPopularityChanged(session.Id, &session.FieldPopularity); err != nil {
+		if len(fieldPopularity) > 0 {
+			if err := trk.SessionFieldPopularityChanged(session.Id, &fieldPopularity); err != nil {
 				log.Println(err)
 			}
 		}
@@ -27,12 +27,12 @@ func (session *SessionData) DecayEvents(trk PopularityListener) {
 
 	si := len(session.ItemEvents)
 	if si > 0 {
-		session.ItemPopularity = session.ItemEvents.Decay(now)
-		if len(session.ItemPopularity) > 0 {
-			if err := trk.SessionPopularityChanged(session.Id, &session.ItemPopularity); err != nil {
+		itemPopularity := session.ItemEvents.Decay(now)
+		if len(itemPopularity) > 0 {
+			if err := trk.SessionPopularityChanged(session.Id, &itemPopularity); err != nil {
 				log.Println(err)
 			} else {
-				log.Printf("Sending session item events %d", len(session.ItemPopularity))
+				log.Printf("Sending session item events %d", len(itemPopularity))
 			}
 		}
 	}
