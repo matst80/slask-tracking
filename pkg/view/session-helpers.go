@@ -173,6 +173,11 @@ func (s *PersistentMemoryTrackingHandler) cleanSessions() {
 	s.EmptyResults = slices.DeleteFunc(s.EmptyResults, func(i SearchEvent) bool {
 		return i.Query == ""
 	})
+	for id, session := range s.Sessions {
+		if session.Id != id {
+			session.Id = id
+		}
+	}
 	log.Println("Cleaning sessions")
 
 	limit := time.Now().Unix() - 60*60*24*7

@@ -455,6 +455,7 @@ type SessionOverview struct {
 	Created    int64 `json:"ts"`
 	LastUpdate int64 `json:"last_update"`
 	LastSync   int64 `json:"last_sync"`
+	Events     int   `json:"event_count"`
 }
 
 func (s *PersistentMemoryTrackingHandler) GetSessions() []SessionOverview {
@@ -465,12 +466,14 @@ func (s *PersistentMemoryTrackingHandler) GetSessions() []SessionOverview {
 	for id, session := range s.Sessions {
 		if len(session.Events) > 1 {
 			session.Id = id
+			log.Printf("Session %d with %d events", id, len(session.Events))
 			sessions[i] = SessionOverview{
 				SessionContent: session.SessionContent,
 				Id:             id,
 				Created:        session.Created,
 				LastUpdate:     session.LastUpdate,
 				LastSync:       session.LastSync,
+				Events:         len(session.Events),
 			}
 			i++
 		}
