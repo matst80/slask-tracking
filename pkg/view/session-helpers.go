@@ -185,6 +185,9 @@ func (s *PersistentMemoryTrackingHandler) cleanSessions() {
 
 	limit := time.Now().Unix() - 60*60*24*7
 	maps.DeleteFunc(s.Sessions, func(key int64, value *SessionData) bool {
+		if value == nil || value.SessionContent == nil {
+			return true
+		}
 		if len(value.Events) < 1 {
 			return true
 		}
