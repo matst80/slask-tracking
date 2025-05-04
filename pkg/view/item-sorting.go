@@ -22,6 +22,8 @@ const REDIS_FIELD_CHANGE = "fieldChange"
 
 const REDIS_SESSION_POPULAR_CHANGE = "sessionChange"
 const REDIS_SESSION_FIELD_CHANGE = "sessionFieldChange"
+const REDIS_GROUP_POPULAR_CHANGE = "groupChange"
+const REDIS_GROUP_FIELD_CHANGE = "groupFieldChange"
 
 func NewSortOverrideStorage(addr string, password string, db int) *SortOverrideStorage {
 	ctx := context.Background()
@@ -91,9 +93,29 @@ func (s *SortOverrideStorage) SessionFieldPopularityChanged(sessionId int64, sor
 }
 
 func (s *SortOverrideStorage) GroupPopularityChanged(groupId string, sort *index.SortOverride) error {
-	return nil
+	content := sort.ToString()
+	id := fmt.Sprintf("group_items_%s", groupId)
+	_, err := s.client.Set(s.ctx, id, content, 0).Result()
+	if err != nil {
+		return err
+	}
+	_, err = s.client.Publish(s.ctx, REDIS_GROUP_POPULAR_CHANGE, id).Result()
+	if err != nil {
+		log.Printf("Error publishing group field popularity change: %v", err)
+	}
+	return err
 }
 
 func (s *SortOverrideStorage) GroupFieldPopularityChanged(groupId string, sort *index.SortOverride) error {
-	return nil
+	content := sort.ToString()
+	id := fmt.Sprintf("group_field_%s", groupId)
+	_, err := s.client.Set(s.ctx, id, content, 0).Result()
+	if err != nil {
+		return err
+	}
+	_, err = s.client.Publish(s.ctx, REDIS_GROUP_FIELD_CHANGE, id).Result()
+	if err != nil {
+		log.Printf("Error publishing group field popularity change: %v", err)
+	}
+	return err
 }
