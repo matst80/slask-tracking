@@ -89,3 +89,11 @@ func (s *SortOverrideStorage) SessionFieldPopularityChanged(sessionId int64, sor
 	}
 	return err
 }
+
+func (s *SortOverrideStorage) GroupPopularityChanged(groupId string, sort *index.SortOverride) error {
+	return nil
+}
+
+func (s *SortOverrideStorage) GroupFieldPopularityChanged(groupId string, sort *index.SortOverride) error {
+	return nil
+}

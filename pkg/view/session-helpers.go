@@ -38,6 +38,36 @@ func (session *SessionData) DecayEvents(trk PopularityListener) {
 	}
 }
 
+func (p *PersonalizationGroup) DecayGroupEvents(trk PopularityListener) {
+	ts := time.Now().Unix()
+	now := ts
+
+	p.LastSync = ts
+	sf := len(p.FieldEvents)
+	if sf > 0 {
+		//log.Printf("Decaying field events %d", sf)
+		fieldPopularity := p.FieldEvents.Decay(now)
+		//log.Printf("Session field popularity %d", len(p.FieldPopularity))
+		if len(fieldPopularity) > 0 {
+			if err := trk.GroupFieldPopularityChanged(p.Id, &fieldPopularity); err != nil {
+				log.Println(err)
+			}
+		}
+	}
+
+	si := len(p.ItemEvents)
+	if si > 0 {
+		itemPopularity := p.ItemEvents.Decay(now)
+		if len(itemPopularity) > 0 {
+			if err := trk.GroupPopularityChanged(p.Id, &itemPopularity); err != nil {
+				log.Println(err)
+			} else {
+				log.Printf("Sending group %s item events %d", p.Name, len(itemPopularity))
+			}
+		}
+	}
+}
+
 func (s *PersistentMemoryTrackingHandler) DecayEvents() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -195,6 +225,17 @@ func (s *PersistentMemoryTrackingHandler) DecaySessionEvents() {
 				session.Id = id
 			}
 			session.DecayEvents(s.trackingHandler)
+		}
+	}
+}
+
+func (s *PersistentMemoryTrackingHandler) DecayGroupEvents() {
+	if s.trackingHandler != nil {
+		for id, group := range s.PersonalizationGroups {
+			if group.Id != id {
+				group.Id = id
+			}
+			group.DecayGroupEvents(s.trackingHandler)
 		}
 	}
 }

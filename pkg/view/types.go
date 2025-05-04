@@ -121,6 +121,8 @@ type PopularityListener interface {
 	FieldPopularityChanged(sort *index.SortOverride) error
 	SessionPopularityChanged(sessionId int64, sort *index.SortOverride) error
 	SessionFieldPopularityChanged(sessionId int64, sort *index.SortOverride) error
+	GroupPopularityChanged(groupId string, sort *index.SortOverride) error
+	GroupFieldPopularityChanged(groupId string, sort *index.SortOverride) error
 }
 
 type Impression struct {
