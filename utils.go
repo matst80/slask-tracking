@@ -16,20 +16,29 @@ func generateSessionId() int64 {
 }
 
 func setSessionCookie(w http.ResponseWriter, r *http.Request, session_id int64) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     "sid",
-		Value:    fmt.Sprintf("%d", session_id),
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteNoneMode,
-		Domain:   strings.TrimPrefix(r.Host, "."),
-		MaxAge:   2592000000,
-		Path:     "/", //MaxAge: 7200
-	})
+	if session_id != 0 {
+		http.SetCookie(w, &http.Cookie{
+			Name:     "sid",
+			Value:    fmt.Sprintf("%d", session_id),
+			HttpOnly: true,
+			Secure:   true,
+			SameSite: http.SameSiteNoneMode,
+			Domain:   strings.TrimPrefix(r.Host, "."),
+			MaxAge:   2592000000,
+			Path:     "/", //MaxAge: 7200
+		})
+	}
 }
 
 func HandleSessionCookie(h view.TrackingHandler, w http.ResponseWriter, r *http.Request) int64 {
 	sessionId := generateSessionId()
+	ca, err := r.Cookie("ca")
+	if err != nil {
+		return 0
+	}
+	if ca.Value != "all" {
+		return 0
+	}
 	c, err := r.Cookie("sid")
 	if err != nil {
 		// fmt.Printf("Failed to get cookie %v", err)
