@@ -12,8 +12,8 @@ type DecayEvent struct {
 }
 
 const (
-	decayRate = 0.9999992
-	maxAge    = 60 * 60 * 24 * 14
+	decayRate = 0.9999970
+	maxAge    = 1000 * 60 * 60 * 24 * 14
 )
 
 func (d *DecayEvent) CalculateValue(now int64) float64 {
