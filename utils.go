@@ -87,6 +87,9 @@ func JsonHandler(handler func(w http.ResponseWriter, r *http.Request) (interface
 			w.Header().Set("Cache-Control", "public, stale-while-revalidate=60")
 		}
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(result)
+		err = json.NewEncoder(w).Encode(result)
+		if err != nil {
+			log.Printf("error responding: %v", err)
+		}
 	}
 }
