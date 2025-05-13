@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -36,9 +37,7 @@ func HandleSessionCookie(h view.TrackingHandler, w http.ResponseWriter, r *http.
 	if err != nil {
 		return 0
 	}
-	if ca.Value != "all" {
-		return 0
-	}
+
 	c, err := r.Cookie("sid")
 	if err != nil {
 		// fmt.Printf("Failed to get cookie %v", err)
@@ -50,12 +49,15 @@ func HandleSessionCookie(h view.TrackingHandler, w http.ResponseWriter, r *http.
 			})
 		}
 		setSessionCookie(w, r, sessionId)
-
 	} else {
 		sessionId, err = strconv.ParseInt(c.Value, 10, 64)
 		if err != nil {
 			setSessionCookie(w, r, sessionId)
 		}
+	}
+	if ca.Value != "all" {
+		log.Printf("not accepted cookie consent, value: %s", ca.Value)
+		return 0
 	}
 	return sessionId
 }
