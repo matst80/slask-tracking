@@ -199,7 +199,7 @@ func (session *SessionData) HandleEvent(event interface{}) map[string]float64 {
 		for _, impression := range e.Items {
 			session.ItemEvents.Add(impression.Id, DecayEvent{
 				TimeStamp: now,
-				Value:     0.02 * float64(max(impression.Position, 300)),
+				Value:     10 + (0.02 * float64(max(impression.Position, 300))),
 			})
 		}
 		break
@@ -362,11 +362,12 @@ func load(path string, result *PersistentMemoryTrackingHandler) error {
 func (s *PersistentMemoryTrackingHandler) Clear() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.changes++
-	s.Sessions = make(map[int64]*SessionData)
-	s.ItemEvents = map[uint][]DecayEvent{}
-	s.FieldEvents = map[uint][]DecayEvent{}
-	s.EmptyResults = make([]SearchEvent, 0)
+	log.Println("Clearing tracking data??")
+	//s.changes++
+	//s.Sessions = make(map[int64]*SessionData)
+	//s.ItemEvents = map[uint][]DecayEvent{}
+	//s.FieldEvents = map[uint][]DecayEvent{}
+	//s.EmptyResults = make([]SearchEvent, 0)
 }
 
 func (s *PersistentMemoryTrackingHandler) GetSession(sessionId int64) *SessionData {
@@ -704,7 +705,7 @@ func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessi
 			LastUpdate:     now,
 			LastSync:       0,
 			Id:             sessionId,
-			Events:         make([]interface{}, 1),
+			Events:         make([]interface{}, 0),
 			ItemEvents:     make(map[uint][]DecayEvent),
 			FieldEvents:    make(map[uint][]DecayEvent),
 		}
