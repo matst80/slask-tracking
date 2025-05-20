@@ -162,7 +162,7 @@ func (session *SessionData) HandleEvent(event interface{}) map[string]float64 {
 
 	ts := time.Now().Unix()
 	now := ts
-
+	session.Events = append(session.Events, event)
 	session.LastUpdate = now
 	switch e := event.(type) {
 	case Event:
