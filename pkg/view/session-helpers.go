@@ -183,7 +183,7 @@ func (s *PersistentMemoryTrackingHandler) cleanSessions() {
 	}
 	log.Println("Cleaning sessions")
 
-	limit := time.Now().Add(time.Hour * (24 * 7)).Unix()
+	limit := time.Now().Add(-time.Hour * (24 * 7)).Unix()
 	maps.DeleteFunc(s.Sessions, func(key int64, value *SessionData) bool {
 		if value == nil || value.SessionContent == nil {
 			return true
@@ -194,7 +194,8 @@ func (s *PersistentMemoryTrackingHandler) cleanSessions() {
 		if value.UserAgent == "" && value.Ip == "" {
 			return true
 		}
-		return value.LastUpdate < limit
+		log.Printf("last update %d, limit %d, ", value.LastUpdate, limit)
+		return false // value.LastUpdate < limit
 	})
 	// for key, item := range s.Sessions {
 	// 	if limit > item.LastUpdate {
