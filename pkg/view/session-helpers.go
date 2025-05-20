@@ -188,18 +188,19 @@ func (s *PersistentMemoryTrackingHandler) cleanSessions() {
 		if value == nil {
 			return true
 		}
-		if value.SessionContent == nil {
-			return true
-		}
-		//if len(value.Events) < 2 {
-		//	log.Printf("Session %d has less than 2 events", key)
+		//if value.SessionContent == nil {
+		//	log.Printf("Session content is nil for key: %d", key)
 		//	return true
 		//}
-		if value.UserAgent == "" && value.Ip == "" {
-			log.Printf("Session %d has no user agent or ip", key)
-			return true
-		}
-		log.Printf("last update %d, limit %d, ", value.LastUpdate, limit)
+		////if len(value.Events) < 2 {
+		////	log.Printf("Session %d has less than 2 events", key)
+		////	return true
+		////}
+		//if value.UserAgent == "" && value.Ip == "" {
+		//	log.Printf("Session %d has no user agent or ip", key)
+		//	return true
+		//}
+		log.Printf("last update %d, limit %d, delete? %v", value.LastUpdate, limit, value.LastUpdate < limit)
 		return value.LastUpdate < limit
 	})
 	// for key, item := range s.Sessions {

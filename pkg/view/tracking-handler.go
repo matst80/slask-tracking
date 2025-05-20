@@ -466,19 +466,19 @@ func (s *PersistentMemoryTrackingHandler) GetSessions() []SessionOverview {
 	sessions := make([]SessionOverview, len(s.Sessions))
 	i := 0
 	for id, session := range s.Sessions {
-		//if len(session.Events) > 1 {
-		session.Id = id
-		log.Printf("Session %d with %d events", id, len(session.Events))
-		sessions[i] = SessionOverview{
-			SessionContent: session.SessionContent,
-			Id:             fmt.Sprintf("%d", id),
-			Created:        session.Created,
-			LastUpdate:     session.LastUpdate,
-			LastSync:       session.LastSync,
-			Events:         len(session.Events),
+		if len(session.Events) > 1 {
+			session.Id = id
+			log.Printf("Session %d with %d events", id, len(session.Events))
+			sessions[i] = SessionOverview{
+				SessionContent: session.SessionContent,
+				Id:             fmt.Sprintf("%d", id),
+				Created:        session.Created,
+				LastUpdate:     session.LastUpdate,
+				LastSync:       session.LastSync,
+				Events:         len(session.Events),
+			}
+			i++
 		}
-		i++
-		//}
 	}
 	return sessions[:i]
 }
