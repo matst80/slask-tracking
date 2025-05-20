@@ -185,17 +185,22 @@ func (s *PersistentMemoryTrackingHandler) cleanSessions() {
 
 	limit := time.Now().Add(-time.Hour * (24 * 7)).Unix()
 	maps.DeleteFunc(s.Sessions, func(key int64, value *SessionData) bool {
-		if value == nil || value.SessionContent == nil {
+		if value == nil {
 			return true
 		}
-		if len(value.Events) < 2 {
+		if value.SessionContent == nil {
 			return true
 		}
+		//if len(value.Events) < 2 {
+		//	log.Printf("Session %d has less than 2 events", key)
+		//	return true
+		//}
 		if value.UserAgent == "" && value.Ip == "" {
+			log.Printf("Session %d has no user agent or ip", key)
 			return true
 		}
 		log.Printf("last update %d, limit %d, ", value.LastUpdate, limit)
-		return false // value.LastUpdate < limit
+		return value.LastUpdate < limit
 	})
 	// for key, item := range s.Sessions {
 	// 	if limit > item.LastUpdate {
