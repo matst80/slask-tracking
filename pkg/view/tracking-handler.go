@@ -698,6 +698,7 @@ func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessi
 
 	session, ok := s.Sessions[sessionId]
 	now := time.Now().Unix()
+	log.Printf("handling session event %T, session found %v, id: %d", event, ok, sessionId)
 	if !ok {
 		sessions_total.Inc()
 		session = &SessionData{
