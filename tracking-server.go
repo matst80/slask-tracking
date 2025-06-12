@@ -207,7 +207,7 @@ func TrackCart(r *http.Request, sessionId int64, trk view.TrackingHandler) error
 }
 
 type DataSet struct {
-	Query    uint   `json:"query"`
+	Query    string `json:"query"`
 	Positive string `json:"positive,omitempty"`
 	Negative string `json:"negative,omitempty"`
 }

@@ -34,7 +34,7 @@ type BaseEvent struct {
 
 type DataSetEvent struct {
 	*BaseEvent
-	Query    uint   `json:"query"`
+	Query    string `json:"query"`
 	Positive string `json:"positive,omitempty"`
 	Negative string `json:"negative,omitempty"`
 }
