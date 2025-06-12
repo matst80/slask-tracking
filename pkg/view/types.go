@@ -13,6 +13,7 @@ const (
 	EVENT_ITEM_IMPRESS  = uint16(5)
 	EVENT_ITEM_ACTION   = uint16(6)
 	EVENT_SUGGEST       = uint16(7)
+	EVENT_DATA_SET      = uint16(8)
 	EVENT_SEARCH        = uint16(1)
 )
 
@@ -28,6 +29,13 @@ type BaseEvent struct {
 	TimeStamp int64  `json:"ts,omitempty"`
 	SessionId int    `json:"session_id,omitempty"`
 	Event     uint16 `json:"event"`
+}
+
+type DataSetEvent struct {
+	*BaseEvent
+	Query    uint   `json:"query"`
+	Positive string `json:"positive,omitempty"`
+	Negative string `json:"negative,omitempty"`
 }
 
 func (e *BaseEvent) SetTimestamp() {

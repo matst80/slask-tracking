@@ -21,6 +21,7 @@ type TrackingHandler interface {
 	//UpdateSessionFromRequest(sessionId int, r *http.Request)
 	HandleSearchEvent(event SearchEventData, r *http.Request)
 	HandleCartEvent(event CartEvent, r *http.Request)
+	HandleDataSetEvent(event DataSetEvent, r *http.Request)
 	HandleEnterCheckout(event EnterCheckoutEvent, r *http.Request)
 	HandleImpressionEvent(event ImpressionEvent, r *http.Request)
 	HandleActionEvent(event ActionEvent, r *http.Request)
@@ -97,6 +98,7 @@ type PersistentMemoryTrackingHandler struct {
 	mu               sync.RWMutex
 	changes          uint
 	updatesToKeep    int
+	DataSet          []DataSetEvent `json:"dataset"`
 	trackingHandler  PopularityListener
 	ItemPopularity   index.SortOverride                   `json:"item_popularity"`
 	Queries          map[string]uint                      `json:"queries"`
@@ -387,6 +389,12 @@ func (s *PersistentMemoryTrackingHandler) GetFieldPopularity() index.SortOverrid
 	return s.FieldPopularity
 }
 
+func (s *PersistentMemoryTrackingHandler) GetDataSet() []DataSetEvent {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.DataSet
+}
+
 func (s *PersistentMemoryTrackingHandler) GetFieldValuePopularity(id uint) interface{} {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -456,6 +464,16 @@ func (s *PersistentMemoryTrackingHandler) HandleCartEvent(event CartEvent, r *ht
 	s.changes++
 	go opsProcessed.Inc()
 	s.updateSession(event, event.SessionId, r)
+}
+
+func (s *PersistentMemoryTrackingHandler) HandleDataSetEvent(event DataSetEvent, r *http.Request) {
+	// log.Printf("DataSet event SessionId: %d, Query: %d, Positive: %s, Negative: %s", event.SessionId, event.Query, event.Positive, event.Negative)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.changes++
+	go opsProcessed.Inc()
+
+	s.DataSet = append(s.DataSet, event)
 }
 
 func normalizeQuery(query string) string {

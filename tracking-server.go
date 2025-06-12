@@ -184,3 +184,26 @@ func TrackCart(r *http.Request, sessionId int, trk view.TrackingHandler) error {
 
 	return nil
 }
+
+type DataSet struct {
+	Query    uint   `json:"query"`
+	Positive string `json:"positive,omitempty"`
+	Negative string `json:"negative,omitempty"`
+}
+
+func TrackDataSet(r *http.Request, sessionId int, trk view.TrackingHandler) error {
+	var data view.DataSetEvent
+	err := json.NewDecoder(r.Body).Decode(&data)
+	if err != nil {
+		return err
+	}
+
+	go trk.HandleDataSetEvent(view.DataSetEvent{
+		BaseEvent: &view.BaseEvent{Event: view.EVENT_DATA_SET, SessionId: sessionId, TimeStamp: time.Now().Unix()},
+		Query:     data.Query,
+		Positive:  data.Positive,
+		Negative:  data.Negative,
+	}, r)
+
+	return nil
+}

@@ -58,6 +58,7 @@ func run_application() int {
 	mux.HandleFunc("/track/action", TrackHandler(viewHandler, TrackAction))
 	mux.HandleFunc("/track/suggest", TrackHandler(viewHandler, TrackSuggest))
 	mux.HandleFunc("/track/cart", TrackHandler(viewHandler, TrackCart))
+	mux.HandleFunc("/track/dataset", TrackHandler(viewHandler, TrackDataSet))
 	mux.HandleFunc("/track/enter-checkout", TrackHandler(viewHandler, TrackCheckout))
 	mux.HandleFunc("GET /tracking/suggest", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		q := r.URL.Query().Get("q")
@@ -68,6 +69,9 @@ func run_application() int {
 	}))
 	mux.HandleFunc("GET /tracking/field-popularity", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		return viewHandler.GetFieldPopularity(), nil
+	}))
+	mux.HandleFunc("GET /tracking/dataset", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+		return viewHandler.GetDataSet(), nil
 	}))
 
 	mux.HandleFunc("GET /tracking/field-popularity/{id}", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
