@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -10,7 +11,7 @@ import (
 	"github.com/matst80/slask-tracking/pkg/view"
 )
 
-func TrackHandler(trk view.TrackingHandler, handler func(r *http.Request, sessionId int, trackingHandler view.TrackingHandler) error) http.HandlerFunc {
+func TrackHandler(trk view.TrackingHandler, handler func(r *http.Request, sessionId int64, trackingHandler view.TrackingHandler) error) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "OPTIONS" {
 			w.Header().Set("Cache-Control", "public, max-age=3600")
@@ -40,7 +41,7 @@ func TrackHandler(trk view.TrackingHandler, handler func(r *http.Request, sessio
 	}
 }
 
-func TrackClick(r *http.Request, sessionId int, trk view.TrackingHandler) error {
+func TrackClick(r *http.Request, sessionId int64, trk view.TrackingHandler) error {
 	id := r.URL.Query().Get("id")
 	itemId, err := strconv.Atoi(id)
 	pos := r.URL.Query().Get("pos")
@@ -51,16 +52,37 @@ func TrackClick(r *http.Request, sessionId int, trk view.TrackingHandler) error 
 
 	go trk.HandleEvent(view.Event{
 		BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_CLICK, SessionId: sessionId, TimeStamp: time.Now().Unix()},
-		Item:      uint(itemId),
-		Position:  float32(position) / 100.0,
+		BaseItem: &view.BaseItem{
+			Id:       uint(itemId),
+			Position: float32(position),
+		},
 		//Referer:   referer,
 	}, r)
 	return nil
 }
 
-func TrackImpression(r *http.Request, sessionId int, trk view.TrackingHandler) error {
+func TrackPostClick(r *http.Request, sessionId int64, trk view.TrackingHandler) error {
+	clickData := &view.BaseItem{}
+	err := json.NewDecoder(r.Body).Decode(clickData)
+	if err != nil {
+		return err
+	}
 
-	data := make([]view.Impression, 0)
+	if clickData.Id == 0 {
+		log.Printf("Click data is empty")
+		return nil
+	}
+	go trk.HandleEvent(view.Event{
+		BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_CLICK, SessionId: sessionId, TimeStamp: time.Now().Unix()},
+		BaseItem:  clickData,
+		//Referer:   referer,
+	}, r)
+	return nil
+}
+
+func TrackImpression(r *http.Request, sessionId int64, trk view.TrackingHandler) error {
+
+	data := make([]view.BaseItem, 0)
 	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
 		return err
@@ -74,7 +96,8 @@ func TrackImpression(r *http.Request, sessionId int, trk view.TrackingHandler) e
 }
 
 type ActionData struct {
-	Item   uint   `json:"item"`
+	Item *view.BaseItem `json:"item,omitempty"`
+	//Item   uint   `json:"item"`
 	Action string `json:"action"`
 	Reason string `json:"reason"`
 }
@@ -85,7 +108,7 @@ type SuggestData struct {
 	Results     int    `json:"results"`
 }
 
-func TrackAction(r *http.Request, sessionId int, trk view.TrackingHandler) error {
+func TrackAction(r *http.Request, sessionId int64, trk view.TrackingHandler) error {
 
 	var data ActionData
 	err := json.NewDecoder(r.Body).Decode(&data)
@@ -95,7 +118,7 @@ func TrackAction(r *http.Request, sessionId int, trk view.TrackingHandler) error
 	referer := r.Header.Get("Referer")
 	go trk.HandleActionEvent(view.ActionEvent{
 		BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_ACTION, SessionId: sessionId, TimeStamp: time.Now().Unix()},
-		Item:      data.Item,
+		BaseItem:  data.Item,
 		Action:    data.Action,
 		Reason:    data.Reason,
 		Referer:   referer,
@@ -104,7 +127,7 @@ func TrackAction(r *http.Request, sessionId int, trk view.TrackingHandler) error
 	return nil
 }
 
-func TrackSuggest(r *http.Request, sessionId int, trk view.TrackingHandler) error {
+func TrackSuggest(r *http.Request, sessionId int64, trk view.TrackingHandler) error {
 
 	var data SuggestData
 	err := json.NewDecoder(r.Body).Decode(&data)
@@ -124,9 +147,8 @@ func TrackSuggest(r *http.Request, sessionId int, trk view.TrackingHandler) erro
 }
 
 type CartData struct {
-	Type     string `json:"type"`
-	Item     uint   `json:"item"`
-	Quantity uint   `json:"quantity"`
+	*view.BaseItem
+	Type string `json:"type"`
 }
 
 func getCartEventType(cartType string) uint16 {
@@ -143,10 +165,10 @@ func getCartEventType(cartType string) uint16 {
 }
 
 type CheckoutData struct {
-	Items []view.Purchase `json:"items"`
+	Items []view.BaseItem `json:"items"`
 }
 
-func TrackCheckout(r *http.Request, sessionId int, trk view.TrackingHandler) error {
+func TrackCheckout(r *http.Request, sessionId int64, trk view.TrackingHandler) error {
 
 	var data CheckoutData
 	err := json.NewDecoder(r.Body).Decode(&data)
@@ -164,7 +186,7 @@ func TrackCheckout(r *http.Request, sessionId int, trk view.TrackingHandler) err
 	return nil
 }
 
-func TrackCart(r *http.Request, sessionId int, trk view.TrackingHandler) error {
+func TrackCart(r *http.Request, sessionId int64, trk view.TrackingHandler) error {
 
 	var data CartData
 	err := json.NewDecoder(r.Body).Decode(&data)
@@ -176,8 +198,7 @@ func TrackCart(r *http.Request, sessionId int, trk view.TrackingHandler) error {
 
 	go trk.HandleCartEvent(view.CartEvent{
 		BaseEvent: &view.BaseEvent{Event: eventType, SessionId: sessionId, TimeStamp: time.Now().Unix()},
-		Item:      data.Item,
-		Quantity:  data.Quantity,
+		BaseItem:  data.BaseItem,
 		Type:      data.Type,
 		//Referer:   referer,
 	}, r)
@@ -191,7 +212,7 @@ type DataSet struct {
 	Negative string `json:"negative,omitempty"`
 }
 
-func TrackDataSet(r *http.Request, sessionId int, trk view.TrackingHandler) error {
+func TrackDataSet(r *http.Request, sessionId int64, trk view.TrackingHandler) error {
 	var data view.DataSetEvent
 	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {

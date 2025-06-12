@@ -6,6 +6,7 @@ import (
 )
 
 func TestDecayEvent_CalculateValue(t *testing.T) {
+
 	tests := []struct {
 		name       string
 		event      DecayEvent
@@ -54,22 +55,22 @@ func TestDecayEvent_CalculateValue(t *testing.T) {
 	}
 	t.Run("Decay after one day", func(t *testing.T) {
 		event := DecayEvent{TimeStamp: 100, Value: 100.0}
-		event.Decay(100 + 60*60*24)
-		if event.Value < 50.0 {
-			t.Errorf("Decayed value %v, want over 50", event.Value)
+		r := event.Decay(100 + 60*60*24)
+		if r < 50.0 {
+			t.Errorf("Decayed value %v, want over 50", r)
 		}
-		if event.Value > 70.0 {
-			t.Errorf("Decayed value %v, want below 70", event.Value)
+		if r > 70.0 {
+			t.Errorf("Decayed value %v, want below 70", r)
 		}
 	})
 	t.Run("Decay after one week", func(t *testing.T) {
 		event := DecayEvent{TimeStamp: 100, Value: 100.0}
-		event.Decay(100 + 60*60*24*7)
-		if event.Value < 50.0 {
-			t.Errorf("Decayed value %v, want over 50", event.Value)
+		r := event.Decay(100 + 60*60*24*7)
+		if r < 50.0 {
+			t.Errorf("Decayed value %v, want over 50", r)
 		}
-		if event.Value > 70.0 {
-			t.Errorf("Decayed value %v, want below 70", event.Value)
+		if r > 70.0 {
+			t.Errorf("Decayed value %v, want below 70", r)
 		}
 	})
 }

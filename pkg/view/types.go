@@ -1,6 +1,7 @@
 package view
 
 import (
+	"strings"
 	"time"
 
 	"github.com/matst80/slask-finder/pkg/index"
@@ -27,7 +28,7 @@ const (
 
 type BaseEvent struct {
 	TimeStamp int64  `json:"ts,omitempty"`
-	SessionId int    `json:"session_id,omitempty"`
+	SessionId int64  `json:"session_id,omitempty"`
 	Event     uint16 `json:"event"`
 }
 
@@ -57,25 +58,49 @@ type Session struct {
 	SessionContent
 }
 
+type BaseItem struct {
+	Id        uint    `json:"id"`
+	Position  float32 `json:"index"`
+	Category  string  `json:"item_category,omitempty"`
+	Category2 string  `json:"item_category2,omitempty"`
+	Category3 string  `json:"item_category3,omitempty"`
+	Category4 string  `json:"item_category4,omitempty"`
+	Category5 string  `json:"item_category5,omitempty"`
+	Brand     string  `json:"item_brand,omitempty"`
+	Name      string  `json:"item_name,omitempty"`
+	Price     float32 `json:"price,omitempty"`
+	Quantity  uint    `json:"quantity,omitempty"`
+}
+
+//   item_name: string;
+//   item_brand?: string;
+//   item_category?: string;
+//   item_category2?: string;
+//   item_category3?: string;
+//   item_category4?: string;
+//   item_category5?: string;
+//   item_list_id?: string;
+//   item_list_name?: string;
+//   index: number;
+//   price?: number;
+
 type Event struct {
 	*BaseEvent
-	Item     uint    `json:"item"`
-	Position float32 `json:"position"`
+	*BaseItem
 	//Referer  string  `json:"referer,omitempty"`
 }
 
 type EnterCheckoutEvent struct {
 	*BaseEvent
-	Items []Purchase `json:"items"`
+	Items []BaseItem `json:"items"`
 	//Referer  string  `json:"referer,omitempty"`
 }
 
 type CartEvent struct {
 	*BaseEvent
+	*BaseItem
+	Type string `json:"type"`
 
-	Type     string `json:"type"`
-	Item     uint   `json:"item"`
-	Quantity uint   `json:"quantity"`
 	//Referer  string `json:"referer,omitempty"`
 }
 
@@ -86,11 +111,11 @@ type Purchase struct {
 
 type PurchaseEvent struct {
 	*BaseEvent
-	Items []Purchase `json:"items"`
+	Items []BaseItem `json:"items"`
 	//Referer string     `json:"referer,omitempty"`
 }
 
-type SearchEventData struct {
+type SearchEvent struct {
 	*BaseEvent
 	*types.Filters
 	NumberOfResults int    `json:"noi"`
@@ -102,8 +127,10 @@ type SearchEventData struct {
 type PopularityListener interface {
 	PopularityChanged(sort *index.SortOverride) error
 	FieldPopularityChanged(sort *index.SortOverride) error
-	SessionPopularityChanged(sessionId int, sort *index.SortOverride) error
-	SessionFieldPopularityChanged(sessionId int, sort *index.SortOverride) error
+	SessionPopularityChanged(sessionId int64, sort *index.SortOverride) error
+	SessionFieldPopularityChanged(sessionId int64, sort *index.SortOverride) error
+	GroupPopularityChanged(groupId string, sort *index.SortOverride) error
+	GroupFieldPopularityChanged(groupId string, sort *index.SortOverride) error
 }
 
 type Impression struct {
@@ -113,12 +140,13 @@ type Impression struct {
 
 type ImpressionEvent struct {
 	*BaseEvent
-	Items []Impression `json:"items"`
+	Items []BaseItem `json:"items"`
 }
 
 type ActionEvent struct {
 	*BaseEvent
-	Item    uint   `json:"id"`
+	*BaseItem
+	//Item    uint   `json:"id"`
 	Action  string `json:"action"`
 	Reason  string `json:"reason"`
 	Referer string `json:"referer,omitempty"`
@@ -130,6 +158,18 @@ type SuggestEvent struct {
 	Suggestions int    `json:"suggestions,omitempty"`
 	Results     int    `json:"results,omitempty"`
 	//Referer     string `json:"referer,omitempty"`
+}
+
+func (e *Event) GetType() uint16 {
+	return e.Event
+}
+
+func (e *SuggestEvent) GetType() uint16 {
+	return e.Event
+}
+
+func (e *SearchEvent) GetType() uint16 {
+	return e.Event
 }
 
 func (e *Session) GetType() uint16 {
@@ -152,6 +192,84 @@ func (e *PurchaseEvent) GetType() uint16 {
 	return e.Event
 }
 
+func (e *EnterCheckoutEvent) GetType() uint16 {
+	return e.Event
+}
+
+func (e *Event) GetBaseEvent() *BaseEvent {
+	return e.BaseEvent
+}
+
+func (e *SuggestEvent) GetBaseEvent() *BaseEvent {
+	return e.BaseEvent
+}
+
+func (e *SearchEvent) GetBaseEvent() *BaseEvent {
+	return e.BaseEvent
+}
+
+func (e *Session) GetBaseEvent() *BaseEvent {
+	return e.BaseEvent
+}
+
+func (e *ActionEvent) GetBaseEvent() *BaseEvent {
+	return e.BaseEvent
+}
+
+func (e *CartEvent) GetBaseEvent() *BaseEvent {
+	return e.BaseEvent
+}
+
+func (e *ImpressionEvent) GetBaseEvent() *BaseEvent {
+	return e.BaseEvent
+}
+
+func (e *PurchaseEvent) GetBaseEvent() *BaseEvent {
+	return e.BaseEvent
+}
+
+func (e *EnterCheckoutEvent) GetBaseEvent() *BaseEvent {
+	return e.BaseEvent
+}
+
+func (e *Event) GetTags() []string {
+	return []string{}
+}
+
+func (e *SuggestEvent) GetTags() []string {
+	return strings.Split(e.Value, " ")
+}
+
+func (e *SearchEvent) GetTags() []string {
+	return []string{}
+}
+
+func (e *Session) GetTags() []string {
+	return []string{}
+}
+
+func (e *ActionEvent) GetTags() []string {
+	return []string{}
+}
+
+func (e *CartEvent) GetTags() []string {
+	return []string{}
+}
+
+func (e *ImpressionEvent) GetTags() []string {
+	return []string{}
+}
+
+func (e *PurchaseEvent) GetTags() []string {
+	return []string{}
+}
+
+func (e *EnterCheckoutEvent) GetTags() []string {
+	return []string{}
+}
+
 type TrackingEvent interface {
 	GetType() uint16
+	GetBaseEvent() *BaseEvent
+	GetTags() []string
 }

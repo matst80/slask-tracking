@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,25 +12,32 @@ import (
 	"github.com/matst80/slask-tracking/pkg/view"
 )
 
-func generateSessionId() int {
-	return int(time.Now().UnixNano())
+func generateSessionId() int64 {
+	return time.Now().UnixNano()
 }
 
-func setSessionCookie(w http.ResponseWriter, r *http.Request, session_id int) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     "sid",
-		Value:    fmt.Sprintf("%d", session_id),
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteNoneMode,
-		Domain:   strings.TrimPrefix(r.Host, "."),
-		MaxAge:   2592000000,
-		Path:     "/", //MaxAge: 7200
-	})
+func setSessionCookie(w http.ResponseWriter, r *http.Request, session_id int64) {
+	if session_id != 0 {
+		http.SetCookie(w, &http.Cookie{
+			Name:     "sid",
+			Value:    fmt.Sprintf("%d", session_id),
+			HttpOnly: true,
+			Secure:   true,
+			SameSite: http.SameSiteNoneMode,
+			Domain:   strings.TrimPrefix(r.Host, "."),
+			MaxAge:   2592000000,
+			Path:     "/", //MaxAge: 7200
+		})
+	}
 }
 
-func HandleSessionCookie(h view.TrackingHandler, w http.ResponseWriter, r *http.Request) int {
+func HandleSessionCookie(h view.TrackingHandler, w http.ResponseWriter, r *http.Request) int64 {
 	sessionId := generateSessionId()
+	ca, err := r.Cookie("ca")
+	if err != nil {
+		return 0
+	}
+
 	c, err := r.Cookie("sid")
 	if err != nil {
 		// fmt.Printf("Failed to get cookie %v", err)
@@ -41,12 +49,15 @@ func HandleSessionCookie(h view.TrackingHandler, w http.ResponseWriter, r *http.
 			})
 		}
 		setSessionCookie(w, r, sessionId)
-
 	} else {
-		sessionId, err = strconv.Atoi(c.Value)
+		sessionId, err = strconv.ParseInt(c.Value, 10, 64)
 		if err != nil {
 			setSessionCookie(w, r, sessionId)
 		}
+	}
+	if ca.Value != "all" {
+		log.Printf("not accepted cookie consent, value: %s", ca.Value)
+		return 0
 	}
 	return sessionId
 }
@@ -71,9 +82,14 @@ func JsonHandler(handler func(w http.ResponseWriter, r *http.Request) (interface
 			w.Header().Set("Access-Control-Allow-Headers", "*")
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 		}
-		w.Header().Set("Age", "0")
-		w.Header().Set("Cache-Control", "private, stale-while-revalidate=10")
+		if r.Method == http.MethodGet {
+			w.Header().Set("Age", "0")
+			w.Header().Set("Cache-Control", "public, stale-while-revalidate=60")
+		}
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(result)
+		err = json.NewEncoder(w).Encode(result)
+		if err != nil {
+			log.Printf("error responding: %v", err)
+		}
 	}
 }

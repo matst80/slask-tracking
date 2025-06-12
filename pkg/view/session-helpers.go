@@ -10,16 +10,16 @@ import (
 
 func (session *SessionData) DecayEvents(trk PopularityListener) {
 	ts := time.Now().Unix()
-	now := ts / 60
+	now := ts
 
 	session.LastSync = ts
 	sf := len(session.FieldEvents)
 	if sf > 0 {
 		//log.Printf("Decaying field events %d", sf)
-		session.FieldPopularity = session.FieldEvents.Decay(now)
+		fieldPopularity := session.FieldEvents.Decay(now)
 		//log.Printf("Session field popularity %d", len(session.FieldPopularity))
-		if len(session.FieldPopularity) > 0 {
-			if err := trk.SessionFieldPopularityChanged(session.Id, &session.FieldPopularity); err != nil {
+		if len(fieldPopularity) > 0 {
+			if err := trk.SessionFieldPopularityChanged(session.Id, &fieldPopularity); err != nil {
 				log.Println(err)
 			}
 		}
@@ -27,11 +27,42 @@ func (session *SessionData) DecayEvents(trk PopularityListener) {
 
 	si := len(session.ItemEvents)
 	if si > 0 {
-		//log.Printf("Decaying item events %d", si)
-		session.ItemPopularity = session.ItemEvents.Decay(now)
-		if len(session.ItemPopularity) > 0 {
-			if err := trk.SessionPopularityChanged(session.Id, &session.ItemPopularity); err != nil {
+		itemPopularity := session.ItemEvents.Decay(now)
+		if len(itemPopularity) > 0 {
+			if err := trk.SessionPopularityChanged(session.Id, &itemPopularity); err != nil {
 				log.Println(err)
+			} else {
+				log.Printf("Sending session item events %d", len(itemPopularity))
+			}
+		}
+	}
+}
+
+func (p *PersonalizationGroup) DecayGroupEvents(trk PopularityListener) {
+	ts := time.Now().Unix()
+	now := ts
+
+	p.LastSync = ts
+	sf := len(p.FieldEvents)
+	if sf > 0 {
+		//log.Printf("Decaying field events %d", sf)
+		fieldPopularity := p.FieldEvents.Decay(now)
+		//log.Printf("Session field popularity %d", len(p.FieldPopularity))
+		if len(fieldPopularity) > 0 {
+			if err := trk.GroupFieldPopularityChanged(p.Id, &fieldPopularity); err != nil {
+				log.Println(err)
+			}
+		}
+	}
+
+	si := len(p.ItemEvents)
+	if si > 0 {
+		itemPopularity := p.ItemEvents.Decay(now)
+		if len(itemPopularity) > 0 {
+			if err := trk.GroupPopularityChanged(p.Id, &itemPopularity); err != nil {
+				log.Println(err)
+			} else {
+				log.Printf("Sending group %s item events %d", p.Name, len(itemPopularity))
 			}
 		}
 	}
@@ -139,17 +170,76 @@ func (s *PersistentMemoryTrackingHandler) DecaySuggestions() {
 func (s *PersistentMemoryTrackingHandler) cleanSessions() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	log.Println("Cleaning sessions")
-	tm := time.Now()
-	limit := tm.Unix() - 60*60*24*7
-	for key, item := range s.Sessions {
-		if limit > item.LastUpdate {
-			log.Printf("Deleting session %d", key)
-			delete(s.Sessions, key)
+	s.EmptyResults = slices.DeleteFunc(s.EmptyResults, func(i SearchEvent) bool {
+		return i.Query == ""
+	})
+	for id, session := range s.Sessions {
+		session.Events = slices.DeleteFunc(session.Events, func(i interface{}) bool {
+			return i == nil
+		})
+		if session.Id != id {
+			session.Id = id
 		}
 	}
+	log.Println("Cleaning sessions")
 
+	limit := time.Now().Add(-time.Hour * (24 * 7)).Unix()
+	maps.DeleteFunc(s.Sessions, func(key int64, value *SessionData) bool {
+		if value == nil {
+			return true
+		}
+		//if value.SessionContent == nil {
+		//	log.Printf("Session content is nil for key: %d", key)
+		//	return true
+		//}
+		////if len(value.Events) < 2 {
+		////	log.Printf("Session %d has less than 2 events", key)
+		////	return true
+		////}
+		//if value.UserAgent == "" && value.Ip == "" {
+		//	log.Printf("Session %d has no user agent or ip", key)
+		//	return true
+		//}
+		log.Printf("last update %d, limit %d, delete? %v", value.LastUpdate, limit, value.LastUpdate < limit)
+		return value.LastUpdate < limit
+	})
+	// for key, item := range s.Sessions {
+	// 	if limit > item.LastUpdate {
+	// 		log.Printf("Deleting session %d", key)
+	// 		delete(s.Sessions, key)
+	// 	}
+	// }
+}
+
+func (s *PersistentMemoryTrackingHandler) DecayFacetValuesEvents() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now().Unix()
+
+	result := map[uint][]FacetValueResult{}
+
+	for facetId, facet := range s.FieldValueEvents {
+		valueResult := make([]FacetValueResult, 0)
+		score := 0.0
+		for value, field := range facet {
+			field.Decay(now)
+			if field.Value > 0.0002 {
+				valueResult = append(valueResult, FacetValueResult{
+					Value: value,
+					Score: field.Value,
+				})
+				score += field.Value
+			}
+		}
+		slices.SortFunc(valueResult, byValueScore)
+		result[facetId] = valueResult
+
+		maps.DeleteFunc(facet, func(key string, value *DecayPopularity) bool {
+			return value.Value < 0.0002
+		})
+	}
+	s.FieldValueScores = result
+	log.Printf("Decayed field events %d", len(s.FieldEvents))
 }
 
 func (s *PersistentMemoryTrackingHandler) DecaySessionEvents() {
@@ -159,6 +249,17 @@ func (s *PersistentMemoryTrackingHandler) DecaySessionEvents() {
 				session.Id = id
 			}
 			session.DecayEvents(s.trackingHandler)
+		}
+	}
+}
+
+func (s *PersistentMemoryTrackingHandler) DecayGroupEvents() {
+	if s.trackingHandler != nil {
+		for id, group := range s.PersonalizationGroups {
+			if group.Id != id {
+				group.Id = id
+			}
+			group.DecayGroupEvents(s.trackingHandler)
 		}
 	}
 }

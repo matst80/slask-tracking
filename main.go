@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/matst80/slask-tracking/pkg/events"
 	"github.com/matst80/slask-tracking/pkg/view"
@@ -41,19 +43,57 @@ func run_application() int {
 		viewHandler.Save()
 		w.WriteHeader(http.StatusAccepted)
 	})
+	mux.HandleFunc("/tracking/variation/{id}", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+		id := r.PathValue("id")
+		sessionId := HandleSessionCookie(viewHandler, w, r)
+		session := viewHandler.GetSession(sessionId)
+		if session == nil {
+			return nil, nil
+		}
+		return session.HandleVariation(id)
+	}))
+
+	mux.HandleFunc("/tracking/my/groups", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+		sessionId := HandleSessionCookie(viewHandler, w, r)
+		session := viewHandler.GetSession(sessionId)
+		if session == nil {
+			return nil, nil
+		}
+
+		groups := session.Groups
+		if len(groups) > 0 {
+			groupValues := make([]string, 0)
+			for id := range groups {
+				groupValues = append(groupValues, id)
+			}
+			http.SetCookie(w, &http.Cookie{
+				Name: "persona", Value: strings.Join(groupValues, ","),
+				HttpOnly: true,
+				Secure:   true,
+				SameSite: http.SameSiteNoneMode,
+				Domain:   strings.TrimPrefix(r.Host, "."),
+				MaxAge:   2592000000,
+				Path:     "/",
+			})
+		}
+
+		return session.Groups, nil
+	}))
 	mux.HandleFunc("/tracking/my/session", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		sessionId := HandleSessionCookie(viewHandler, w, r)
 		return viewHandler.GetSession(sessionId), nil
 	}))
 	mux.HandleFunc("/tracking/session/{id}", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		id := r.PathValue("id")
-		sessionId, err := strconv.Atoi(id)
+		sessionId, err := strconv.ParseInt(id, 10, 64)
+		log.Printf("fetching session id: %d", sessionId)
 		if err != nil {
 			return nil, err
 		}
 		return viewHandler.GetSession(sessionId), nil
 	}))
-	mux.HandleFunc("/track/click", TrackHandler(viewHandler, TrackClick))
+	mux.HandleFunc("GET /track/click", TrackHandler(viewHandler, TrackClick))
+	mux.HandleFunc("POST /track/click", TrackHandler(viewHandler, TrackPostClick))
 	mux.HandleFunc("/track/impressions", TrackHandler(viewHandler, TrackImpression))
 	mux.HandleFunc("/track/action", TrackHandler(viewHandler, TrackAction))
 	mux.HandleFunc("/track/suggest", TrackHandler(viewHandler, TrackSuggest))
@@ -63,6 +103,24 @@ func run_application() int {
 	mux.HandleFunc("GET /tracking/suggest", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		q := r.URL.Query().Get("q")
 		return viewHandler.GetSuggestions(q), nil
+	}))
+	mux.HandleFunc("GET /tracking/funnels", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+		return viewHandler.GetFunnels()
+	}))
+	mux.HandleFunc("PUT /tracking/funnels", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+		var funnels []view.Funnel
+		err := json.NewDecoder(r.Body).Decode(&funnels)
+		if err != nil {
+			return nil, err
+		}
+		err = viewHandler.SetFunnels(funnels)
+		if err != nil {
+			return nil, err
+		}
+		return viewHandler.GetFunnels()
+	}))
+	mux.HandleFunc("GET /tracking/item-events", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+		return viewHandler.GetItemEvents(), nil
 	}))
 	mux.HandleFunc("GET /tracking/popularity", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		return viewHandler.GetItemPopularity(), nil
@@ -74,6 +132,10 @@ func run_application() int {
 		return viewHandler.GetDataSet(), nil
 	}))
 
+	mux.HandleFunc("GET /tracking/clear", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+		viewHandler.Clear()
+		return true, nil
+	}))
 	mux.HandleFunc("GET /tracking/field-popularity/{id}", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		idString := r.PathValue("id")
 		id, err := strconv.Atoi(idString)
@@ -85,6 +147,9 @@ func run_application() int {
 
 	mux.HandleFunc("GET /tracking/queries", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		return viewHandler.GetQueries(), nil
+	}))
+	mux.HandleFunc("GET /tracking/no-results", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+		return viewHandler.GetNoResultQueries(), nil
 	}))
 	// mux.HandleFunc("/tracking/updated", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	// 	return viewHandler.GetUpdatedItems(), nil

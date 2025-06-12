@@ -136,7 +136,7 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 					log.Printf("Failed to unmarshal session message %v", err)
 				}
 			case 1:
-				var searchEventData view.SearchEventData
+				var searchEventData view.SearchEvent
 				if err := json.Unmarshal(d.Body, &searchEventData); err == nil {
 					searchEventData.SetTimestamp()
 					handler.HandleSearchEvent(searchEventData, nil)
