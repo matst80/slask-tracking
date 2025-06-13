@@ -200,7 +200,7 @@ func (s *PersistentMemoryTrackingHandler) cleanSessions() {
 		//	log.Printf("Session %d has no user agent or ip", key)
 		//	return true
 		//}
-		log.Printf("last update %d, limit %d, delete? %v", value.LastUpdate, limit, value.LastUpdate < limit)
+		//log.Printf("last update %d, limit %d, delete? %v", value.LastUpdate, limit, value.LastUpdate < limit)
 		return value.LastUpdate < limit
 	})
 	// for key, item := range s.Sessions {
