@@ -19,34 +19,36 @@ var redisUrl = os.Getenv("REDIS_URL")
 var redisPassword = os.Getenv("REDIS_PASSWORD")
 
 func run_application() int {
-	client := events.RabbitTransportClient{
-		RabbitTrackingConfig: events.RabbitTrackingConfig{
-			TrackingTopic: "tracking",
-			//ItemsUpsertedTopic: "item_added",
-			Url:   rabbitUrl,
-			VHost: os.Getenv("RABBIT_HOST"),
-		},
-	}
-	viewHandler := view.MakeMemoryTrackingHandler("data/tracking.json", 500)
+	client := events.RabbitTransportClient{RabbitTrackingConfig: events.RabbitTrackingConfig{TrackingTopic: "tracking", Url: rabbitUrl, VHost: os.Getenv("RABBIT_HOST")}}
+	memoryHandler := view.MakeMemoryTrackingHandler("data/tracking.json", 500)
 	popularityHandler := view.NewSortOverrideStorage(redisUrl, redisPassword, 0)
 
-	defer viewHandler.Save()
-	go client.Connect(viewHandler)
+	// optional clickhouse
+	var trackingHandler view.TrackingHandler = memoryHandler
+	if chStore, err := events.NewClickHouseStorageFromEnv(); err != nil {
+		log.Printf("ClickHouse init error: %v", err)
+	} else if chStore != nil {
+		trackingHandler = events.NewMultiTrackingHandler(memoryHandler, chStore)
+		log.Printf("ClickHouse tracking enabled")
+	}
+
+	defer memoryHandler.Save()
+	go client.Connect(trackingHandler)
 	// go client.ConnectUpdates(viewHandler)
 	// go client.ConnectPriceUpdates(viewHandler)
-	viewHandler.ConnectPopularityListener(popularityHandler)
+	memoryHandler.ConnectPopularityListener(popularityHandler)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 	mux.HandleFunc("/tracking/save", func(w http.ResponseWriter, r *http.Request) {
-		viewHandler.Save()
+		memoryHandler.Save()
 		w.WriteHeader(http.StatusAccepted)
 	})
 	mux.HandleFunc("/tracking/variation/{id}", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		id := r.PathValue("id")
-		sessionId := HandleSessionCookie(viewHandler, w, r)
-		session := viewHandler.GetSession(sessionId)
+		sessionId := HandleSessionCookie(memoryHandler, w, r)
+		session := memoryHandler.GetSession(sessionId)
 		if session == nil {
 			return nil, nil
 		}
@@ -54,8 +56,8 @@ func run_application() int {
 	}))
 
 	mux.HandleFunc("/tracking/my/groups", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-		sessionId := HandleSessionCookie(viewHandler, w, r)
-		session := viewHandler.GetSession(sessionId)
+		sessionId := HandleSessionCookie(memoryHandler, w, r)
+		session := memoryHandler.GetSession(sessionId)
 		if session == nil {
 			return nil, nil
 		}
@@ -80,8 +82,8 @@ func run_application() int {
 		return session.Groups, nil
 	}))
 	mux.HandleFunc("/tracking/my/session", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-		sessionId := HandleSessionCookie(viewHandler, w, r)
-		return viewHandler.GetSession(sessionId), nil
+		sessionId := HandleSessionCookie(memoryHandler, w, r)
+		return memoryHandler.GetSession(sessionId), nil
 	}))
 	mux.HandleFunc("/tracking/session/{id}", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		id := r.PathValue("id")
@@ -90,22 +92,22 @@ func run_application() int {
 		if err != nil {
 			return nil, err
 		}
-		return viewHandler.GetSession(sessionId), nil
+		return memoryHandler.GetSession(sessionId), nil
 	}))
-	mux.HandleFunc("GET /track/click", TrackHandler(viewHandler, TrackClick))
-	mux.HandleFunc("POST /track/click", TrackHandler(viewHandler, TrackPostClick))
-	mux.HandleFunc("/track/impressions", TrackHandler(viewHandler, TrackImpression))
-	mux.HandleFunc("/track/action", TrackHandler(viewHandler, TrackAction))
-	mux.HandleFunc("/track/suggest", TrackHandler(viewHandler, TrackSuggest))
-	mux.HandleFunc("/track/cart", TrackHandler(viewHandler, TrackCart))
-	mux.HandleFunc("/track/dataset", TrackHandler(viewHandler, TrackDataSet))
-	mux.HandleFunc("/track/enter-checkout", TrackHandler(viewHandler, TrackCheckout))
+	mux.HandleFunc("GET /track/click", TrackHandler(trackingHandler, TrackClick))
+	mux.HandleFunc("POST /track/click", TrackHandler(trackingHandler, TrackPostClick))
+	mux.HandleFunc("/track/impressions", TrackHandler(trackingHandler, TrackImpression))
+	mux.HandleFunc("/track/action", TrackHandler(trackingHandler, TrackAction))
+	mux.HandleFunc("/track/suggest", TrackHandler(trackingHandler, TrackSuggest))
+	mux.HandleFunc("/track/cart", TrackHandler(trackingHandler, TrackCart))
+	mux.HandleFunc("/track/dataset", TrackHandler(trackingHandler, TrackDataSet))
+	mux.HandleFunc("/track/enter-checkout", TrackHandler(trackingHandler, TrackCheckout))
 	mux.HandleFunc("GET /tracking/suggest", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		q := r.URL.Query().Get("q")
-		return viewHandler.GetSuggestions(q), nil
+		return memoryHandler.GetSuggestions(q), nil
 	}))
 	mux.HandleFunc("GET /tracking/funnels", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-		return viewHandler.GetFunnels()
+		return memoryHandler.GetFunnels()
 	}))
 	mux.HandleFunc("PUT /tracking/funnels", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		var funnels []view.Funnel
@@ -113,27 +115,27 @@ func run_application() int {
 		if err != nil {
 			return nil, err
 		}
-		err = viewHandler.SetFunnels(funnels)
+		err = memoryHandler.SetFunnels(funnels)
 		if err != nil {
 			return nil, err
 		}
-		return viewHandler.GetFunnels()
+		return memoryHandler.GetFunnels()
 	}))
 	mux.HandleFunc("GET /tracking/item-events", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-		return viewHandler.GetItemEvents(), nil
+		return memoryHandler.GetItemEvents(), nil
 	}))
 	mux.HandleFunc("GET /tracking/popularity", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-		return viewHandler.GetItemPopularity(), nil
+		return memoryHandler.GetItemPopularity(), nil
 	}))
 	mux.HandleFunc("GET /tracking/field-popularity", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-		return viewHandler.GetFieldPopularity(), nil
+		return memoryHandler.GetFieldPopularity(), nil
 	}))
 	mux.HandleFunc("GET /tracking/dataset", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-		return viewHandler.GetDataSet(), nil
+		return memoryHandler.GetDataSet(), nil
 	}))
 
 	mux.HandleFunc("GET /tracking/clear", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-		viewHandler.Clear()
+		memoryHandler.Clear()
 		return true, nil
 	}))
 	mux.HandleFunc("GET /tracking/field-popularity/{id}", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
@@ -142,20 +144,20 @@ func run_application() int {
 		if err != nil {
 			return nil, err
 		}
-		return viewHandler.GetFieldValuePopularity(uint(id)), nil
+		return memoryHandler.GetFieldValuePopularity(uint(id)), nil
 	}))
 
 	mux.HandleFunc("GET /tracking/queries", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-		return viewHandler.GetQueries(), nil
+		return memoryHandler.GetQueries(), nil
 	}))
 	mux.HandleFunc("GET /tracking/no-results", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-		return viewHandler.GetNoResultQueries(), nil
+		return memoryHandler.GetNoResultQueries(), nil
 	}))
 	// mux.HandleFunc("/tracking/updated", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	// 	return viewHandler.GetUpdatedItems(), nil
 	// }))
 	mux.HandleFunc("GET /tracking/sessions", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-		return viewHandler.GetSessions(), nil
+		return memoryHandler.GetSessions(), nil
 	}))
 	mux.Handle("/metrics", promhttp.Handler())
 	log.Println("Starting server on port 8080")
