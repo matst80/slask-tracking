@@ -87,8 +87,8 @@ func (q *QueryMatcher) AddKeyFilterEvent(key uint, value string) {
 }
 
 type ProductRelation struct {
-	ItemId uint                 `json:"item_id"`
-	Other  map[string]DecayList `json:"other"`
+	ItemId uint               `json:"item_id"`
+	Other  map[uint]DecayList `json:"other"`
 }
 
 type PersistentMemoryTrackingHandler struct {
@@ -97,8 +97,8 @@ type PersistentMemoryTrackingHandler struct {
 	changes               uint
 	updatesToKeep         int
 	trackingHandler       PopularityListener
-	ViewedTogether        map[string]ProductRelation           `json:"viewed_together"`
-	AlsoBought            map[string]ProductRelation           `json:"also_bought"`
+	ViewedTogether        map[uint]ProductRelation             `json:"viewed_together"`
+	AlsoBought            map[uint]ProductRelation             `json:"also_bought"`
 	DataSet               []DataSetEvent                       `json:"dataset"`
 	FieldValueScores      map[uint][]FacetValueResult          `json:"field_value_scores"`
 	ItemPopularity        index.SortOverride                   `json:"item_popularity"`
@@ -118,7 +118,7 @@ type PersistentMemoryTrackingHandler struct {
 
 type SessionData struct {
 	*SessionContent
-	VisitedSkus []string               `json:"visited_skus"`
+	VisitedSkus []uint                 `json:"visited_skus"`
 	Groups      map[string]float64     `json:"groups"`
 	Variations  map[string]interface{} `json:"variations"`
 	// ItemPopularity  index.SortOverride     `json:"item_popularity"`
@@ -161,6 +161,9 @@ func (session *SessionData) HandleEvent(event interface{}) map[string]float64 {
 	}
 	if session.FieldEvents == nil {
 		session.FieldEvents = make(map[uint][]DecayEvent)
+	}
+	if session.VisitedSkus == nil {
+		session.VisitedSkus = make([]uint, 0)
 	}
 	if session.Events == nil {
 		log.Printf("make new event-list, %s", session.Id)
@@ -212,6 +215,7 @@ func (session *SessionData) HandleEvent(event interface{}) map[string]float64 {
 				TimeStamp: now,
 				Value:     10 + (0.02 * float64(max(impression.Position, 300))),
 			})
+			session.VisitedSkus = append(session.VisitedSkus, impression.Id)
 		}
 		break
 	case CartEvent:
@@ -271,8 +275,8 @@ func MakeMemoryTrackingHandler(path string, itemsToKeep int) *PersistentMemoryTr
 		changes:          0,
 		updatesToKeep:    0,
 		trackingHandler:  nil,
-		ViewedTogether:   make(map[string]ProductRelation),
-		AlsoBought:       make(map[string]ProductRelation),
+		ViewedTogether:   make(map[uint]ProductRelation),
+		AlsoBought:       make(map[uint]ProductRelation),
 		DataSet:          make([]DataSetEvent, 0),
 		EmptyResults:     make([]SearchEvent, 0),
 		QueryEvents:      make(map[string]QueryMatcher),
@@ -369,7 +373,13 @@ func load(path string, result *PersistentMemoryTrackingHandler) error {
 	defer file.Close()
 
 	err = json.NewDecoder(file).Decode(result)
-
+	// tmp since the fields does not exist in the json
+	if result.ViewedTogether == nil {
+		result.ViewedTogether = make(map[uint]ProductRelation)
+	}
+	if result.AlsoBought == nil {
+		result.AlsoBought = make(map[uint]ProductRelation)
+	}
 	return err
 }
 
@@ -563,6 +573,39 @@ func (s *PersistentMemoryTrackingHandler) handleFunnels(event TrackingEvent) {
 	}
 }
 
+func (s *PersistentMemoryTrackingHandler) handleLinkedProducts(session *SessionData, event interface{}) {
+	if session == nil {
+		return
+	}
+
+	switch e := event.(type) {
+	case Event:
+		if e.BaseItem != nil && e.Id > 0 {
+			for _, viewed := range session.VisitedSkus {
+				if viewed == e.Id {
+					continue
+				}
+				viewedRelation, ok := s.ViewedTogether[viewed]
+				if !ok {
+					viewedRelation = ProductRelation{
+						ItemId: viewed,
+						Other:  make(map[uint]DecayList),
+					}
+					list := make(DecayList, 0)
+					list.Add(e.Id, DecayEvent{
+						TimeStamp: time.Now().Unix(),
+						Value:     20,
+					})
+
+					viewedRelation.Other[e.Id] = list
+					s.ViewedTogether[viewed] = viewedRelation
+				}
+			}
+		}
+	}
+
+}
+
 func (s *PersistentMemoryTrackingHandler) HandleEnterCheckout(event EnterCheckoutEvent, r *http.Request) {
 	// log.Printf("EnterCheckout event SessionId: %d, ItemId: %d, Quantity: %d", event.SessionId, event.Item, event.Quantity)
 	s.mu.Lock()
@@ -726,7 +769,7 @@ func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEvent, r
 
 }
 
-func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessionId int64, r *http.Request) {
+func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessionId int64, r *http.Request) *SessionData {
 
 	session, ok := s.Sessions[sessionId]
 	now := time.Now().Unix()
@@ -739,7 +782,7 @@ func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessi
 			LastUpdate:     now,
 			LastSync:       0,
 			Id:             sessionId,
-			VisitedSkus:    make([]string, 0),
+			VisitedSkus:    make([]uint, 0),
 			Events:         make([]interface{}, 0),
 			ItemEvents:     make(map[uint][]DecayEvent),
 			FieldEvents:    make(map[uint][]DecayEvent),
@@ -760,7 +803,7 @@ func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessi
 			}
 		}
 	}
-
+	return s.Sessions[sessionId]
 }
 
 func (s *PersistentMemoryTrackingHandler) HandleImpressionEvent(event ImpressionEvent, r *http.Request) {
@@ -775,6 +818,7 @@ func (s *PersistentMemoryTrackingHandler) HandleImpressionEvent(event Impression
 		//s.ItemPopularity[impression.Id] += 5.01 + float64(impression.Position)/10
 	}
 	s.updateSession(event, event.SessionId, r)
+
 	go s.handleFunnels(&event)
 	s.changes++
 
