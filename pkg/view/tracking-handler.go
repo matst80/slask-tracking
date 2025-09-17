@@ -86,12 +86,19 @@ func (q *QueryMatcher) AddKeyFilterEvent(key uint, value string) {
 
 }
 
+type ProductRelation struct {
+	ItemId uint                 `json:"item_id"`
+	Other  map[string]DecayList `json:"other"`
+}
+
 type PersistentMemoryTrackingHandler struct {
 	path                  string
 	mu                    sync.RWMutex
 	changes               uint
 	updatesToKeep         int
 	trackingHandler       PopularityListener
+	ViewedTogether        map[string]ProductRelation           `json:"viewed_together"`
+	AlsoBought            map[string]ProductRelation           `json:"also_bought"`
 	DataSet               []DataSetEvent                       `json:"dataset"`
 	FieldValueScores      map[uint][]FacetValueResult          `json:"field_value_scores"`
 	ItemPopularity        index.SortOverride                   `json:"item_popularity"`
@@ -111,8 +118,9 @@ type PersistentMemoryTrackingHandler struct {
 
 type SessionData struct {
 	*SessionContent
-	Groups     map[string]float64     `json:"groups"`
-	Variations map[string]interface{} `json:"variations"`
+	VisitedSkus []string               `json:"visited_skus"`
+	Groups      map[string]float64     `json:"groups"`
+	Variations  map[string]interface{} `json:"variations"`
 	// ItemPopularity  index.SortOverride     `json:"item_popularity"`
 	// FieldPopularity index.SortOverride     `json:"field_popularity"`
 	Id          int64         `json:"id"`
@@ -263,6 +271,8 @@ func MakeMemoryTrackingHandler(path string, itemsToKeep int) *PersistentMemoryTr
 		changes:          0,
 		updatesToKeep:    0,
 		trackingHandler:  nil,
+		ViewedTogether:   make(map[string]ProductRelation),
+		AlsoBought:       make(map[string]ProductRelation),
 		DataSet:          make([]DataSetEvent, 0),
 		EmptyResults:     make([]SearchEvent, 0),
 		QueryEvents:      make(map[string]QueryMatcher),
@@ -515,15 +525,18 @@ func (s *PersistentMemoryTrackingHandler) HandleSessionEvent(event Session) {
 	s.changes++
 	opsProcessed.Inc()
 
-	events := make([]interface{}, 0)
-	s.Sessions[event.SessionId] = &SessionData{
-		SessionContent: &event.SessionContent,
-		Created:        time.Now().Unix(),
-		LastUpdate:     time.Now().Unix(),
-		Events:         events,
-		ItemEvents:     make(map[uint][]DecayEvent),
-		FieldEvents:    make(map[uint][]DecayEvent),
-	}
+	//events := make([]interface{}, 0)
+	s.updateSession(event, event.SessionId, nil)
+	// s.Sessions[event.SessionId] = &SessionData{
+	// 	SessionContent: &event.SessionContent,
+	// 	Created:        time.Now().Unix(),
+	// 	LastUpdate:     time.Now().Unix(),
+	// 	Events:         events,
+	// 	VisitedSkus:    make([]string, 0),
+	// 	Id:             event.SessionId,
+	// 	ItemEvents:     make(map[uint][]DecayEvent),
+	// 	FieldEvents:    make(map[uint][]DecayEvent),
+	// }
 }
 
 func (s *PersistentMemoryTrackingHandler) HandleEvent(event Event, r *http.Request) {
@@ -726,6 +739,7 @@ func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessi
 			LastUpdate:     now,
 			LastSync:       0,
 			Id:             sessionId,
+			VisitedSkus:    make([]string, 0),
 			Events:         make([]interface{}, 0),
 			ItemEvents:     make(map[uint][]DecayEvent),
 			FieldEvents:    make(map[uint][]DecayEvent),
