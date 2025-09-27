@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/matst80/slask-finder/pkg/index"
+	"github.com/matst80/slask-finder/pkg/sorting"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -101,11 +101,11 @@ type PersistentMemoryTrackingHandler struct {
 	AlsoBought            map[uint]ProductRelation             `json:"also_bought"`
 	DataSet               []DataSetEvent                       `json:"dataset"`
 	FieldValueScores      map[uint][]FacetValueResult          `json:"field_value_scores"`
-	ItemPopularity        index.SortOverride                   `json:"item_popularity"`
+	ItemPopularity        sorting.SortOverride                 `json:"item_popularity"`
 	Queries               map[string]uint                      `json:"queries"`
 	QueryEvents           map[string]QueryMatcher              `json:"suggestions"`
 	Sessions              map[int64]*SessionData               `json:"sessions"`
-	FieldPopularity       index.SortOverride                   `json:"field_popularity"`
+	FieldPopularity       sorting.SortOverride                 `json:"field_popularity"`
 	ItemEvents            DecayList                            `json:"item_events"`
 	FieldEvents           DecayList                            `json:"field_events"`
 	SortedQueries         []QueryResult                        `json:"sorted_queries"`
@@ -280,10 +280,10 @@ func MakeMemoryTrackingHandler(path string, itemsToKeep int) *PersistentMemoryTr
 		DataSet:          make([]DataSetEvent, 0),
 		EmptyResults:     make([]SearchEvent, 0),
 		QueryEvents:      make(map[string]QueryMatcher),
-		ItemPopularity:   make(index.SortOverride),
+		ItemPopularity:   make(sorting.SortOverride),
 		Queries:          make(map[string]uint),
 		Sessions:         make(map[int64]*SessionData),
-		FieldPopularity:  make(index.SortOverride),
+		FieldPopularity:  make(sorting.SortOverride),
 		ItemEvents:       map[uint][]DecayEvent{},
 		FieldEvents:      map[uint][]DecayEvent{},
 		FieldValueEvents: make(map[uint]map[string]*DecayPopularity),
@@ -506,7 +506,7 @@ func (s *PersistentMemoryTrackingHandler) GetSessions() []SessionOverview {
 	return sessions[:i]
 }
 
-func (s *PersistentMemoryTrackingHandler) GetFieldPopularity() index.SortOverride {
+func (s *PersistentMemoryTrackingHandler) GetFieldPopularity() sorting.SortOverride {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.FieldPopularity

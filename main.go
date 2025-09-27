@@ -8,32 +8,32 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/matst80/slask-tracking/pkg/events"
 	"github.com/matst80/slask-tracking/pkg/view"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 var rabbitUrl = os.Getenv("RABBIT_URL")
-var redisUrl = os.Getenv("REDIS_URL")
-var redisPassword = os.Getenv("REDIS_PASSWORD")
+
+func init() {
+	if rabbitUrl == "" {
+		log.Fatalf("RABBIT_URL environment variable is not set")
+	}
+}
 
 func run_application() int {
-	client := events.RabbitTransportClient{
-		RabbitTrackingConfig: events.RabbitTrackingConfig{
-			TrackingTopic: "tracking",
-			//ItemsUpsertedTopic: "item_added",
-			Url:   rabbitUrl,
-			VHost: os.Getenv("RABBIT_HOST"),
-		},
-	}
+
+	conn, err := amqp.DialConfig(rabbitUrl, amqp.Config{
+		Properties: amqp.NewConnectionProperties(),
+	})
+
 	viewHandler := view.MakeMemoryTrackingHandler("data/tracking.json", 500)
-	popularityHandler := view.NewSortOverrideStorage(redisUrl, redisPassword, 0)
+	popularityHandler := view.NewSortOverrideStorage(conn)
 
 	defer viewHandler.Save()
-	go client.Connect(viewHandler)
-	// go client.ConnectUpdates(viewHandler)
-	// go client.ConnectPriceUpdates(viewHandler)
+	//go client.Connect(viewHandler)
+
 	viewHandler.ConnectPopularityListener(popularityHandler)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -159,7 +159,7 @@ func run_application() int {
 	}))
 	mux.Handle("/metrics", promhttp.Handler())
 	log.Println("Starting server on port 8080")
-	err := http.ListenAndServe(":8080", mux)
+	err = http.ListenAndServe(":8080", mux)
 	if err != nil {
 		return 1
 	}
