@@ -6,40 +6,36 @@ import (
 	"log"
 
 	"github.com/matst80/slask-finder/pkg/index"
-	"github.com/redis/go-redis/v9"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type SortOverrideStorage struct {
-	client *redis.Client
-	ctx    context.Context
+	conn *amqp.Connection
+	ctx  context.Context
 }
 
-const REDIS_POPULAR_KEY = "_popular"
-const REDIS_POPULAR_CHANGE = "popularChange"
+// const REDIS_POPULAR_KEY = "_popular"
+// const REDIS_POPULAR_CHANGE = "popularChange"
 
-const REDIS_FIELD_KEY = "_field"
-const REDIS_FIELD_CHANGE = "fieldChange"
+// const REDIS_FIELD_KEY = "_field"
+// const REDIS_FIELD_CHANGE = "fieldChange"
 
-const REDIS_SESSION_POPULAR_CHANGE = "sessionChange"
-const REDIS_SESSION_FIELD_CHANGE = "sessionFieldChange"
-const REDIS_GROUP_POPULAR_CHANGE = "groupChange"
-const REDIS_GROUP_FIELD_CHANGE = "groupFieldChange"
+// const REDIS_SESSION_POPULAR_CHANGE = "sessionChange"
+// const REDIS_SESSION_FIELD_CHANGE = "sessionFieldChange"
+// const REDIS_GROUP_POPULAR_CHANGE = "groupChange"
+// const REDIS_GROUP_FIELD_CHANGE = "groupFieldChange"
 
-func NewSortOverrideStorage(addr string, password string, db int) *SortOverrideStorage {
+func NewSortOverrideStorage(conn *amqp.Connection) *SortOverrideStorage {
 	ctx := context.Background()
 
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     addr,
-		Password: password,
-		DB:       db,
-	})
 	return &SortOverrideStorage{
-		client: rdb,
-		ctx:    ctx,
+		conn: conn,
+		ctx:  ctx,
 	}
 }
 
 func (s *SortOverrideStorage) PopularityChanged(sort *index.SortOverride) error {
+
 	data := sort.ToString()
 	_, err := s.client.Set(s.ctx, REDIS_POPULAR_KEY, data, 0).Result()
 	if err != nil {

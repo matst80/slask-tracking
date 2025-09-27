@@ -701,22 +701,11 @@ func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEvent, r
 			})
 			//queryEvents.Popularity.Decay(ts)
 			for _, filter := range event.Filters.StringFilter {
-				switch v := filter.Value.(type) {
-				case string:
-					queryEvents.AddKeyFilterEvent(filter.Id, v)
-				case []string:
-					for _, value := range v {
-						queryEvents.AddKeyFilterEvent(filter.Id, value)
-					}
-				case []interface{}:
-					for _, value := range v {
-						if strValue, ok := value.(string); ok {
-							queryEvents.AddKeyFilterEvent(filter.Id, strValue)
-						}
-					}
-				default:
-					log.Printf("Unknown type %T for filter %d", filter.Value, filter.Id)
+
+				for _, value := range filter.Value {
+					queryEvents.AddKeyFilterEvent(filter.Id, value)
 				}
+
 			}
 		}
 	} else {
@@ -743,15 +732,9 @@ func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEvent, r
 						Value:     80,
 					})
 				}
-				switch v := filter.Value.(type) {
-				case string:
-					addFieldValueEvent(v)
-				case []string:
-					for _, value := range v {
-						addFieldValueEvent(value)
-					}
-				default:
-					log.Printf("Unknown type %T for filter %d", filter.Value, filter.Id)
+
+				for _, value := range filter.Value {
+					addFieldValueEvent(value)
 				}
 
 			}
