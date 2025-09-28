@@ -43,18 +43,6 @@ func (s *SortOverrideStorage) PopularityChanged(sort *sorting.SortOverride) erro
 		Key:  "popular",
 		Data: *sort,
 	})
-	// data := sort.ToString()
-
-	// _, err := s.client.Set(s.ctx, REDIS_POPULAR_KEY, data, 0).Result()
-	// if err != nil {
-	// 	return err
-	// }
-
-	// _, err = s.client.Publish(s.ctx, REDIS_POPULAR_CHANGE, "external").Result()
-	// if err != nil {
-	// 	log.Printf("Error publishing popularity change: %v", err)
-	// }
-	// return err
 	return nil
 }
 

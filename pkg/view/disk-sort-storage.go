@@ -34,12 +34,12 @@ func (s *DiskOverrideStorage) saveToFile(filename string, data string) error {
 
 func (s *DiskOverrideStorage) PopularityChanged(sort *sorting.SortOverride) error {
 	data := sort.ToString()
-	return s.saveToFile("item-sort", data)
+	return s.saveToFile("popular", data)
 }
 
 func (s *DiskOverrideStorage) FieldPopularityChanged(sort *sorting.SortOverride) error {
 	data := sort.ToString()
-	return s.saveToFile("field-sort", data)
+	return s.saveToFile("popular-fields", data)
 }
 
 func (s *DiskOverrideStorage) SessionPopularityChanged(sessionId int64, sort *sorting.SortOverride) error {
