@@ -2,14 +2,18 @@ package view
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/matst80/slask-finder/pkg/messaging"
 	"github.com/matst80/slask-finder/pkg/sorting"
+	"github.com/matst80/slask-finder/pkg/types"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type SortOverrideStorage struct {
-	conn *amqp.Connection
-	ctx  context.Context
+	conn        *amqp.Connection
+	ctx         context.Context
+	diskStorage *DiskOverrideStorage
 }
 
 // const REDIS_POPULAR_KEY = "_popular"
@@ -25,15 +29,20 @@ type SortOverrideStorage struct {
 
 func NewSortOverrideStorage(conn *amqp.Connection) *SortOverrideStorage {
 	ctx := context.Background()
-
+	diskStorage := DiskPopularityListener("data")
 	return &SortOverrideStorage{
-		conn: conn,
-		ctx:  ctx,
+		conn:        conn,
+		ctx:         ctx,
+		diskStorage: diskStorage,
 	}
 }
 
 func (s *SortOverrideStorage) PopularityChanged(sort *sorting.SortOverride) error {
-
+	s.diskStorage.PopularityChanged(sort)
+	messaging.SendChange(s.conn, "global", "sort_override", types.SortOverrideUpdate{
+		Key:  "popular",
+		Data: *sort,
+	})
 	// data := sort.ToString()
 
 	// _, err := s.client.Set(s.ctx, REDIS_POPULAR_KEY, data, 0).Result()
@@ -50,73 +59,41 @@ func (s *SortOverrideStorage) PopularityChanged(sort *sorting.SortOverride) erro
 }
 
 func (s *SortOverrideStorage) FieldPopularityChanged(sort *sorting.SortOverride) error {
-	// data := sort.ToString()
-	// _, err := s.client.Set(s.ctx, REDIS_FIELD_KEY, data, 0).Result()
-	// if err != nil {
-	// 	return err
-	// }
-
-	// _, err = s.client.Publish(s.ctx, REDIS_FIELD_CHANGE, "external").Result()
-	// if err != nil {
-	// 	log.Printf("Error publishing field popularity change: %v", err)
-	// }
-	// return err
-	return nil
+	s.diskStorage.FieldPopularityChanged(sort)
+	return messaging.SendChange(s.conn, "global", "sort_override", types.SortOverrideUpdate{
+		Key:  "popular-fields",
+		Data: *sort,
+	})
 }
 
 func (s *SortOverrideStorage) SessionPopularityChanged(sessionId int64, sort *sorting.SortOverride) error {
-	// data := sort.ToString()
-	// id := fmt.Sprintf("_item_%d", sessionId)
-	// _, err := s.client.Set(s.ctx, id, data, 0).Result()
-	// if err != nil {
-	// 	return err
-	// }
-	// _, err = s.client.Publish(s.ctx, REDIS_SESSION_POPULAR_CHANGE, id).Result()
-	// return err
-	return nil
+	s.diskStorage.SessionPopularityChanged(sessionId, sort)
+	return messaging.SendChange(s.conn, "global", "sort_override", types.SortOverrideUpdate{
+		Key:  fmt.Sprintf("session-%d", sessionId),
+		Data: *sort,
+	})
 }
 
 func (s *SortOverrideStorage) SessionFieldPopularityChanged(sessionId int64, sort *sorting.SortOverride) error {
-	// content := sort.ToString()
-	// id := fmt.Sprintf("_field_%d", sessionId)
-	// _, err := s.client.Set(s.ctx, id, content, 0).Result()
-	// if err != nil {
-	// 	return err
-	// }
-	// _, err = s.client.Publish(s.ctx, REDIS_SESSION_FIELD_CHANGE, id).Result()
-	// if err != nil {
-	// 	log.Printf("Error publishing session field popularity change: %v", err)
-	// }
-	// return err
-	return nil
+	s.diskStorage.SessionFieldPopularityChanged(sessionId, sort)
+	return messaging.SendChange(s.conn, "global", "sort_override", types.SortOverrideUpdate{
+		Key:  fmt.Sprintf("session-fields-%d", sessionId),
+		Data: *sort,
+	})
 }
 
 func (s *SortOverrideStorage) GroupPopularityChanged(groupId string, sort *sorting.SortOverride) error {
-	// content := sort.ToString()
-	// id := fmt.Sprintf("group_items_%s", groupId)
-	// _, err := s.client.Set(s.ctx, id, content, 0).Result()
-	// if err != nil {
-	// 	return err
-	// }
-	// _, err = s.client.Publish(s.ctx, REDIS_GROUP_POPULAR_CHANGE, id).Result()
-	// if err != nil {
-	// 	log.Printf("Error publishing group field popularity change: %v", err)
-	// }
-	// return err
-	return nil
+	s.diskStorage.GroupPopularityChanged(groupId, sort)
+	return messaging.SendChange(s.conn, "global", "sort_override", types.SortOverrideUpdate{
+		Key:  fmt.Sprintf("group-%s", groupId),
+		Data: *sort,
+	})
 }
 
 func (s *SortOverrideStorage) GroupFieldPopularityChanged(groupId string, sort *sorting.SortOverride) error {
-	// content := sort.ToString()
-	// id := fmt.Sprintf("group_field_%s", groupId)
-	// _, err := s.client.Set(s.ctx, id, content, 0).Result()
-	// if err != nil {
-	// 	return err
-	// }
-	// _, err = s.client.Publish(s.ctx, REDIS_GROUP_FIELD_CHANGE, id).Result()
-	// if err != nil {
-	// 	log.Printf("Error publishing group field popularity change: %v", err)
-	// }
-	// return err
-	return nil
+	s.diskStorage.GroupFieldPopularityChanged(groupId, sort)
+	return messaging.SendChange(s.conn, "global", "sort_override", types.SortOverrideUpdate{
+		Key:  fmt.Sprintf("group-fields-%s", groupId),
+		Data: *sort,
+	})
 }

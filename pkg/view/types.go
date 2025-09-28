@@ -28,6 +28,8 @@ const (
 
 type BaseEvent struct {
 	TimeStamp int64  `json:"ts,omitempty"`
+	Country   string `json:"country,omitempty"`
+	Context   string `json:"context,omitempty"`
 	SessionId int64  `json:"session_id,omitempty"`
 	Event     uint16 `json:"event"`
 }

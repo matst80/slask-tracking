@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/matst80/slask-finder/pkg/messaging"
 	"github.com/matst80/slask-tracking/pkg/view"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -15,6 +16,7 @@ import (
 )
 
 var rabbitUrl = os.Getenv("RABBIT_URL")
+var country = "no"
 
 func init() {
 	if rabbitUrl == "" {
@@ -27,6 +29,17 @@ func run_application() int {
 	conn, err := amqp.DialConfig(rabbitUrl, amqp.Config{
 		Properties: amqp.NewConnectionProperties(),
 	})
+	if err != nil {
+		log.Fatalf("Failed to connect to RabbitMQ: %v", err)
+	}
+	ch, err := conn.Channel()
+	if err != nil {
+		log.Fatalf("Failed to open a channel: %v", err)
+	}
+	err = messaging.DefineTopic(ch, "global", "sort_override")
+	if err != nil {
+		log.Fatalf("Failed to define topic: %v", err)
+	}
 
 	viewHandler := view.MakeMemoryTrackingHandler("data/tracking.json", 500)
 	popularityHandler := view.NewSortOverrideStorage(conn)
