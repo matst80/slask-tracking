@@ -29,7 +29,7 @@ type SortOverrideStorage struct {
 
 func NewSortOverrideStorage(conn *amqp.Connection) *SortOverrideStorage {
 	ctx := context.Background()
-	diskStorage := DiskPopularityListener("data")
+	diskStorage := DiskPopularityListener("data/overrides")
 	return &SortOverrideStorage{
 		conn:        conn,
 		ctx:         ctx,

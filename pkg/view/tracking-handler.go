@@ -111,7 +111,7 @@ type PersistentMemoryTrackingHandler struct {
 	SortedQueries         []QueryResult                        `json:"sorted_queries"`
 	FieldValueEvents      map[uint]map[string]*DecayPopularity `json:"field_value_events"`
 	Funnels               []Funnel                             `json:"funnel_storage"`
-	EmptyResults          []SearchEvent                        `json:"empty_results"`
+	EmptyResults          []SearchEvent                        `json:"empty_results_v2"`
 	PersonalizationGroups map[string]PersonalizationGroup      `json:"personalization_groups"`
 	//UpdatedItems    []interface{}        `json:"updated_items"`
 }
