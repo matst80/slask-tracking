@@ -3,6 +3,7 @@ package view
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/matst80/slask-finder/pkg/messaging"
 	"github.com/matst80/slask-finder/pkg/sorting"
@@ -30,6 +31,18 @@ type SortOverrideStorage struct {
 func NewSortOverrideStorage(conn *amqp.Connection) *SortOverrideStorage {
 	ctx := context.Background()
 	diskStorage := DiskPopularityListener("data/overrides")
+	ch, err := conn.Channel()
+	if err != nil {
+		log.Fatalf("Unable to create channel %v", err)
+	}
+	err = messaging.DefineTopic(ch, "global", "sort_override")
+	if err != nil {
+		log.Fatalf("Unable to define topic %v", err)
+	}
+	err = messaging.DefineTopic(ch, "global", "field_sort_override")
+	if err != nil {
+		log.Fatalf("Unable to define topic %v", err)
+	}
 	return &SortOverrideStorage{
 		conn:        conn,
 		ctx:         ctx,
@@ -48,7 +61,7 @@ func (s *SortOverrideStorage) PopularityChanged(sort *sorting.SortOverride) erro
 
 func (s *SortOverrideStorage) FieldPopularityChanged(sort *sorting.SortOverride) error {
 	s.diskStorage.FieldPopularityChanged(sort)
-	return messaging.SendChange(s.conn, "global", "sort_override", types.SortOverrideUpdate{
+	return messaging.SendChange(s.conn, "global", "field_sort_override", types.SortOverrideUpdate{
 		Key:  "popular-fields",
 		Data: *sort,
 	})
@@ -64,7 +77,7 @@ func (s *SortOverrideStorage) SessionPopularityChanged(sessionId int64, sort *so
 
 func (s *SortOverrideStorage) SessionFieldPopularityChanged(sessionId int64, sort *sorting.SortOverride) error {
 	s.diskStorage.SessionFieldPopularityChanged(sessionId, sort)
-	return messaging.SendChange(s.conn, "global", "sort_override", types.SortOverrideUpdate{
+	return messaging.SendChange(s.conn, "global", "field_sort_override", types.SortOverrideUpdate{
 		Key:  fmt.Sprintf("session-fields-%d", sessionId),
 		Data: *sort,
 	})
