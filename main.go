@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/matst80/slask-finder/pkg/messaging"
 	"github.com/matst80/slask-tracking/pkg/events"
@@ -44,6 +46,17 @@ func run_application() int {
 
 	viewHandler := view.MakeMemoryTrackingHandler("data/tracking.json", 500)
 	popularityHandler := view.NewSortOverrideStorage(conn)
+
+	if cfg, ok := loadClickhouseConfigFromEnv(); ok {
+		chHandler, err := view.NewClickhouseTrackingHandler(context.Background(), cfg)
+		if err != nil {
+			log.Printf("clickhouse logging disabled: %v", err)
+		} else {
+			viewHandler.AttachFollower(chHandler)
+			defer chHandler.Close()
+			log.Printf("clickhouse logging enabled for %s.%s", cfg.Database, cfg.EventsTable)
+		}
+	}
 
 	defer viewHandler.Save()
 	go func() {
@@ -187,4 +200,90 @@ func run_application() int {
 
 func main() {
 	os.Exit(run_application())
+}
+
+func loadClickhouseConfigFromEnv() (view.ClickhouseConfig, bool) {
+	addressesEnv := os.Getenv("CLICKHOUSE_ADDR")
+	if addressesEnv == "" {
+		addressesEnv = os.Getenv("CLICKHOUSE_ADDRESSES")
+	}
+	addresses := splitAndNormaliseAddresses(addressesEnv)
+	if len(addresses) == 0 {
+		return view.ClickhouseConfig{}, false
+	}
+
+	cfg := view.ClickhouseConfig{
+		Addresses:     addresses,
+		Database:      getenvDefault("CLICKHOUSE_DATABASE", "tracking"),
+		Username:      os.Getenv("CLICKHOUSE_USERNAME"),
+		Password:      os.Getenv("CLICKHOUSE_PASSWORD"),
+		EventsTable:   getenvDefault("CLICKHOUSE_EVENTS_TABLE", "events"),
+		SessionsTable: getenvDefault("CLICKHOUSE_SESSIONS_TABLE", "sessions"),
+		Secure:        parseBoolEnv("CLICKHOUSE_SECURE"),
+		SkipVerifyTLS: parseBoolEnv("CLICKHOUSE_INSECURE_SKIP_VERIFY"),
+	}
+
+	if d := parseDurationEnv("CLICKHOUSE_DIAL_TIMEOUT"); d > 0 {
+		cfg.DialTimeout = d
+	}
+	if d := parseDurationEnv("CLICKHOUSE_READ_TIMEOUT"); d > 0 {
+		cfg.ReadTimeout = d
+	}
+	if d := parseDurationEnv("CLICKHOUSE_WRITE_TIMEOUT"); d > 0 {
+		cfg.WriteTimeout = d
+	}
+
+	return cfg, true
+}
+
+func splitAndNormaliseAddresses(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	parts := strings.FieldsFunc(value, func(r rune) bool {
+		return r == ',' || r == ' ' || r == ';'
+	})
+	addresses := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if !strings.Contains(part, "//") && !strings.Contains(part, ":") {
+			part = part + ":9000"
+		}
+		addresses = append(addresses, part)
+	}
+	return addresses
+}
+
+func getenvDefault(key, fallback string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
+func parseBoolEnv(key string) bool {
+	value := strings.TrimSpace(strings.ToLower(os.Getenv(key)))
+	switch value {
+	case "1", "true", "yes", "y", "on":
+		return true
+	default:
+		return false
+	}
+}
+
+func parseDurationEnv(key string) time.Duration {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return 0
+	}
+	duration, err := time.ParseDuration(value)
+	if err != nil {
+		log.Printf("invalid duration for %s: %v", key, err)
+		return 0
+	}
+	return duration
 }

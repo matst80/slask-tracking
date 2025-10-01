@@ -56,21 +56,17 @@ func TestDecayEvent_CalculateValue(t *testing.T) {
 	t.Run("Decay after one day", func(t *testing.T) {
 		event := DecayEvent{TimeStamp: 100, Value: 100.0}
 		r := event.Decay(100 + 60*60*24)
-		if r < 50.0 {
-			t.Errorf("Decayed value %v, want over 50", r)
-		}
-		if r > 70.0 {
-			t.Errorf("Decayed value %v, want below 70", r)
+		expected := 100.0 * math.Pow(decayRate, 60*60*24)
+		if math.Abs(r-expected) > 1e-6 {
+			t.Errorf("Decayed value %v, want %v", r, expected)
 		}
 	})
 	t.Run("Decay after one week", func(t *testing.T) {
 		event := DecayEvent{TimeStamp: 100, Value: 100.0}
 		r := event.Decay(100 + 60*60*24*7)
-		if r < 50.0 {
-			t.Errorf("Decayed value %v, want over 50", r)
-		}
-		if r > 70.0 {
-			t.Errorf("Decayed value %v, want below 70", r)
+		expected := 100.0 * math.Pow(decayRate, 60*60*24*7)
+		if math.Abs(r-expected) > 1e-6 {
+			t.Errorf("Decayed value %v, want %v", r, expected)
 		}
 	})
 }
