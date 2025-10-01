@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/matst80/slask-finder/pkg/index"
+	"github.com/matst80/slask-finder/pkg/sorting"
 	"github.com/matst80/slask-finder/pkg/types"
 )
 
@@ -28,6 +28,8 @@ const (
 
 type BaseEvent struct {
 	TimeStamp int64  `json:"ts,omitempty"`
+	Country   string `json:"country,omitempty"`
+	Context   string `json:"context,omitempty"`
 	SessionId int64  `json:"session_id,omitempty"`
 	Event     uint16 `json:"event"`
 }
@@ -125,12 +127,12 @@ type SearchEvent struct {
 }
 
 type PopularityListener interface {
-	PopularityChanged(sort *index.SortOverride) error
-	FieldPopularityChanged(sort *index.SortOverride) error
-	SessionPopularityChanged(sessionId int64, sort *index.SortOverride) error
-	SessionFieldPopularityChanged(sessionId int64, sort *index.SortOverride) error
-	GroupPopularityChanged(groupId string, sort *index.SortOverride) error
-	GroupFieldPopularityChanged(groupId string, sort *index.SortOverride) error
+	PopularityChanged(sort *sorting.SortOverride) error
+	FieldPopularityChanged(sort *sorting.SortOverride) error
+	SessionPopularityChanged(sessionId int64, sort *sorting.SortOverride) error
+	SessionFieldPopularityChanged(sessionId int64, sort *sorting.SortOverride) error
+	GroupPopularityChanged(groupId string, sort *sorting.SortOverride) error
+	GroupFieldPopularityChanged(groupId string, sort *sorting.SortOverride) error
 }
 
 type Impression struct {

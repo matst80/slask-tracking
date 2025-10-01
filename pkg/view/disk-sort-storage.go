@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/matst80/slask-finder/pkg/index"
+	"github.com/matst80/slask-finder/pkg/sorting"
 )
 
 type DiskOverrideStorage struct {
@@ -32,32 +32,32 @@ func (s *DiskOverrideStorage) saveToFile(filename string, data string) error {
 	return nil
 }
 
-func (s *DiskOverrideStorage) PopularityChanged(sort *index.SortOverride) error {
+func (s *DiskOverrideStorage) PopularityChanged(sort *sorting.SortOverride) error {
 	data := sort.ToString()
-	return s.saveToFile("item-sort", data)
+	return s.saveToFile("popular", data)
 }
 
-func (s *DiskOverrideStorage) FieldPopularityChanged(sort *index.SortOverride) error {
+func (s *DiskOverrideStorage) FieldPopularityChanged(sort *sorting.SortOverride) error {
 	data := sort.ToString()
-	return s.saveToFile("field-sort", data)
+	return s.saveToFile("popular-fields", data)
 }
 
-func (s *DiskOverrideStorage) SessionPopularityChanged(sessionId int64, sort *index.SortOverride) error {
+func (s *DiskOverrideStorage) SessionPopularityChanged(sessionId int64, sort *sorting.SortOverride) error {
 	data := sort.ToString()
 	return s.saveToFile(fmt.Sprintf("session-items-%d", sessionId), data)
 }
 
-func (s *DiskOverrideStorage) SessionFieldPopularityChanged(sessionId int64, sort *index.SortOverride) error {
+func (s *DiskOverrideStorage) SessionFieldPopularityChanged(sessionId int64, sort *sorting.SortOverride) error {
 	data := sort.ToString()
 	return s.saveToFile(fmt.Sprintf("session-fields-%d", sessionId), data)
 }
 
-func (s *DiskOverrideStorage) GroupPopularityChanged(groupId string, sort *index.SortOverride) error {
+func (s *DiskOverrideStorage) GroupPopularityChanged(groupId string, sort *sorting.SortOverride) error {
 	data := sort.ToString()
 	return s.saveToFile(fmt.Sprintf("group-items-%s", groupId), data)
 }
 
-func (s *DiskOverrideStorage) GroupFieldPopularityChanged(groupId string, sort *index.SortOverride) error {
+func (s *DiskOverrideStorage) GroupFieldPopularityChanged(groupId string, sort *sorting.SortOverride) error {
 	data := sort.ToString()
 	return s.saveToFile(fmt.Sprintf("group-fields-%s", groupId), data)
 }

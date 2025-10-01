@@ -40,7 +40,7 @@ func (p *PersonalizationGroup) HandleEvent(event interface{}) {
 		} else {
 			log.Printf("Event without item %+v", event)
 		}
-		break
+
 	case SearchEvent:
 		for _, filter := range e.Filters.StringFilter {
 			p.FieldEvents.Add(filter.Id, DecayEvent{
@@ -54,7 +54,7 @@ func (p *PersonalizationGroup) HandleEvent(event interface{}) {
 				Value:     100,
 			})
 		}
-		break
+
 	case ImpressionEvent:
 		for _, impression := range e.Items {
 			p.ItemEvents.Add(impression.Id, DecayEvent{
@@ -62,13 +62,13 @@ func (p *PersonalizationGroup) HandleEvent(event interface{}) {
 				Value:     0.02 * float64(max(impression.Position, 300)),
 			})
 		}
-		break
+
 	case CartEvent:
 		p.ItemEvents.Add(e.Id, DecayEvent{
 			TimeStamp: now,
 			Value:     700,
 		})
-		break
+
 	case ActionEvent:
 		if e.BaseItem != nil && e.Id > 0 {
 			p.ItemEvents.Add(e.Id, DecayEvent{
@@ -76,7 +76,7 @@ func (p *PersonalizationGroup) HandleEvent(event interface{}) {
 				Value:     80,
 			})
 		}
-		break
+
 	case PurchaseEvent:
 		for _, purchase := range e.Items {
 			p.ItemEvents.Add(purchase.Id, DecayEvent{
@@ -84,6 +84,6 @@ func (p *PersonalizationGroup) HandleEvent(event interface{}) {
 				Value:     800 * float64(purchase.Quantity),
 			})
 		}
-		break
+
 	}
 }

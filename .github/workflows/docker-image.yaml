@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - "main"
+      - "feature/multi-source-amqp"
 
 jobs:
   docker:
@@ -27,4 +28,4 @@ jobs:
           #          platforms: linux/amd64,linux/arm64
           platforms: linux/amd64
           push: true
-          tags: matst80/slask-tracking:latest
+          tags: matst80/s10n-tracking:latest

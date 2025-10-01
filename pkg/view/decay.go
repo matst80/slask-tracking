@@ -3,7 +3,7 @@ package view
 import (
 	"math"
 
-	"github.com/matst80/slask-finder/pkg/index"
+	"github.com/matst80/slask-finder/pkg/sorting"
 )
 
 type DecayEvent struct {
@@ -94,8 +94,8 @@ func (d *DecayList) Add(key uint, value DecayEvent) {
 	}
 }
 
-func (d *DecayList) Decay(now int64) index.SortOverride {
-	result := index.SortOverride{}
+func (d *DecayList) Decay(now int64) sorting.SortOverride {
+	result := sorting.SortOverride{}
 	var popularity float64
 	var event DecayEvent
 
