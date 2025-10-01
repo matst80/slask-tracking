@@ -97,6 +97,9 @@ type PersistentMemoryTrackingHandler struct {
 	changes               uint
 	updatesToKeep         int
 	trackingHandler       PopularityListener
+	followers             []TrackingHandler
+	ViewedTogether        map[uint]ProductRelation             `json:"viewed_together"`
+	AlsoBought            map[uint]ProductRelation             `json:"also_bought"`
 	DataSet               []DataSetEvent                       `json:"dataset"`
 	FieldValueScores      map[uint][]FacetValueResult          `json:"field_value_scores"`
 	ItemPopularity        sorting.SortOverride                 `json:"item_popularity"`
@@ -299,6 +302,9 @@ func MakeMemoryTrackingHandler(path string, itemsToKeep int) *PersistentMemoryTr
 		changes:          0,
 		updatesToKeep:    0,
 		trackingHandler:  nil,
+		followers:        make([]TrackingHandler, 0),
+		ViewedTogether:   make(map[uint]ProductRelation),
+		AlsoBought:       make(map[uint]ProductRelation),
 		DataSet:          make([]DataSetEvent, 0),
 		EmptyResults:     make([]SearchEvent, 0),
 		QueryEvents:      make(map[string]QueryMatcher),
