@@ -97,6 +97,7 @@ type PersistentMemoryTrackingHandler struct {
 	changes               uint
 	updatesToKeep         int
 	trackingHandler       PopularityListener
+	followers             []TrackingHandler
 	ViewedTogether        map[uint]ProductRelation             `json:"viewed_together"`
 	AlsoBought            map[uint]ProductRelation             `json:"also_bought"`
 	DataSet               []DataSetEvent                       `json:"dataset"`
@@ -150,10 +151,6 @@ func (session *SessionData) HandleVariation(id string) (interface{}, error) {
 	return ret, nil
 
 }
-
-const (
-	eventLimit = 500
-)
 
 func (session *SessionData) HandleEvent(event interface{}) map[string]float64 {
 	if session.ItemEvents == nil {
@@ -267,6 +264,36 @@ func (s *PersistentMemoryTrackingHandler) ConnectPopularityListener(handler Popu
 	s.trackingHandler = handler
 }
 
+func (s *PersistentMemoryTrackingHandler) AttachFollower(handler TrackingHandler) {
+	if handler == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.followers = append(s.followers, handler)
+}
+
+func (s *PersistentMemoryTrackingHandler) dispatchFollowers(dispatch func(TrackingHandler)) {
+	if dispatch == nil {
+		return
+	}
+	s.mu.RLock()
+	followers := make([]TrackingHandler, len(s.followers))
+	copy(followers, s.followers)
+	s.mu.RUnlock()
+	for _, follower := range followers {
+		follower := follower
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("tracking follower panic: %v", r)
+				}
+			}()
+			dispatch(follower)
+		}()
+	}
+}
+
 func MakeMemoryTrackingHandler(path string, itemsToKeep int) *PersistentMemoryTrackingHandler {
 
 	instance := &PersistentMemoryTrackingHandler{
@@ -275,6 +302,7 @@ func MakeMemoryTrackingHandler(path string, itemsToKeep int) *PersistentMemoryTr
 		changes:          0,
 		updatesToKeep:    0,
 		trackingHandler:  nil,
+		followers:        make([]TrackingHandler, 0),
 		ViewedTogether:   make(map[uint]ProductRelation),
 		AlsoBought:       make(map[uint]ProductRelation),
 		DataSet:          make([]DataSetEvent, 0),
@@ -529,6 +557,9 @@ func (s *PersistentMemoryTrackingHandler) GetFieldValuePopularity(id uint) inter
 }
 
 func (s *PersistentMemoryTrackingHandler) HandleSessionEvent(event Session) {
+	s.dispatchFollowers(func(handler TrackingHandler) {
+		handler.HandleSessionEvent(event)
+	})
 	// log.Printf("Session new session event %d", event.SessionId)
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -550,6 +581,9 @@ func (s *PersistentMemoryTrackingHandler) HandleSessionEvent(event Session) {
 }
 
 func (s *PersistentMemoryTrackingHandler) HandleEvent(event Event, r *http.Request) {
+	s.dispatchFollowers(func(handler TrackingHandler) {
+		handler.HandleEvent(event, r)
+	})
 	// log.Printf("Event SessionId: %d, ItemId: %d, Position: %f", event.SessionId, event.Item, event.Position)
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -607,6 +641,9 @@ func (s *PersistentMemoryTrackingHandler) handleLinkedProducts(session *SessionD
 }
 
 func (s *PersistentMemoryTrackingHandler) HandleEnterCheckout(event EnterCheckoutEvent, r *http.Request) {
+	s.dispatchFollowers(func(handler TrackingHandler) {
+		handler.HandleEnterCheckout(event, r)
+	})
 	// log.Printf("EnterCheckout event SessionId: %d, ItemId: %d, Quantity: %d", event.SessionId, event.Item, event.Quantity)
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -623,6 +660,9 @@ func (s *PersistentMemoryTrackingHandler) HandleEnterCheckout(event EnterCheckou
 }
 
 func (s *PersistentMemoryTrackingHandler) HandleCartEvent(event CartEvent, r *http.Request) {
+	s.dispatchFollowers(func(handler TrackingHandler) {
+		handler.HandleCartEvent(event, r)
+	})
 	// log.Printf("Cart event SessionId: %d, ItemId: %d, Quantity: %d", event.SessionId, event.Item, event.Quantity)
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -637,6 +677,9 @@ func (s *PersistentMemoryTrackingHandler) HandleCartEvent(event CartEvent, r *ht
 }
 
 func (s *PersistentMemoryTrackingHandler) HandleDataSetEvent(event DataSetEvent, r *http.Request) {
+	s.dispatchFollowers(func(handler TrackingHandler) {
+		handler.HandleDataSetEvent(event, r)
+	})
 	// log.Printf("DataSet event SessionId: %d, Query: %d, Positive: %s, Negative: %s", event.SessionId, event.Query, event.Positive, event.Negative)
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -664,6 +707,9 @@ func (s *PersistentMemoryTrackingHandler) UpdateSessionFromRequest(sessionId int
 }
 
 func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEvent, r *http.Request) {
+	s.dispatchFollowers(func(handler TrackingHandler) {
+		handler.HandleSearchEvent(event, r)
+	})
 	if event.NumberOfResults == 0 {
 		if s.EmptyResults == nil {
 			s.EmptyResults = make([]SearchEvent, 0)
@@ -790,6 +836,9 @@ func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessi
 }
 
 func (s *PersistentMemoryTrackingHandler) HandleImpressionEvent(event ImpressionEvent, r *http.Request) {
+	s.dispatchFollowers(func(handler TrackingHandler) {
+		handler.HandleImpressionEvent(event, r)
+	})
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	go opsProcessed.Inc()
@@ -808,6 +857,9 @@ func (s *PersistentMemoryTrackingHandler) HandleImpressionEvent(event Impression
 }
 
 func (s *PersistentMemoryTrackingHandler) HandleActionEvent(event ActionEvent, r *http.Request) {
+	s.dispatchFollowers(func(handler TrackingHandler) {
+		handler.HandleActionEvent(event, r)
+	})
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	go opsProcessed.Inc()
@@ -823,6 +875,9 @@ func (s *PersistentMemoryTrackingHandler) HandleActionEvent(event ActionEvent, r
 }
 
 func (s *PersistentMemoryTrackingHandler) HandleSuggestEvent(event SuggestEvent, r *http.Request) {
+	s.dispatchFollowers(func(handler TrackingHandler) {
+		handler.HandleSuggestEvent(event, r)
+	})
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	go opsProcessed.Inc()

@@ -41,6 +41,20 @@ func TrackHandler(trk view.TrackingHandler, handler func(r *http.Request, sessio
 	}
 }
 
+func updateBaseEvent(r *http.Request, baseEvent *view.BaseEvent) *view.BaseEvent {
+	country := "se"
+	ref := r.Referer()
+	if strings.Contains(ref, "-no") {
+		country = "no"
+	}
+	if baseEvent.TimeStamp == 0 {
+		baseEvent.TimeStamp = time.Now().Unix()
+	}
+	baseEvent.Country = country
+	baseEvent.Context = "b2c"
+	return baseEvent
+}
+
 func TrackClick(r *http.Request, sessionId int64, trk view.TrackingHandler) error {
 	id := r.URL.Query().Get("id")
 	itemId, err := strconv.Atoi(id)
@@ -51,7 +65,7 @@ func TrackClick(r *http.Request, sessionId int64, trk view.TrackingHandler) erro
 	}
 
 	go trk.HandleEvent(view.Event{
-		BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_CLICK, SessionId: sessionId, TimeStamp: time.Now().Unix()},
+		BaseEvent: updateBaseEvent(r, &view.BaseEvent{Event: view.EVENT_ITEM_CLICK, SessionId: sessionId}),
 		BaseItem: &view.BaseItem{
 			Id:       uint(itemId),
 			Position: float32(position),
@@ -73,7 +87,7 @@ func TrackPostClick(r *http.Request, sessionId int64, trk view.TrackingHandler) 
 		return nil
 	}
 	go trk.HandleEvent(view.Event{
-		BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_CLICK, SessionId: sessionId, TimeStamp: time.Now().Unix()},
+		BaseEvent: updateBaseEvent(r, &view.BaseEvent{Event: view.EVENT_ITEM_CLICK, SessionId: sessionId}),
 		BaseItem:  clickData,
 		//Referer:   referer,
 	}, r)
@@ -88,7 +102,7 @@ func TrackImpression(r *http.Request, sessionId int64, trk view.TrackingHandler)
 		return err
 	}
 	go trk.HandleImpressionEvent(view.ImpressionEvent{
-		BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_IMPRESS, SessionId: sessionId, TimeStamp: time.Now().Unix()},
+		BaseEvent: updateBaseEvent(r, &view.BaseEvent{Event: view.EVENT_ITEM_IMPRESS, SessionId: sessionId}),
 		Items:     data,
 	}, r)
 
@@ -117,7 +131,7 @@ func TrackAction(r *http.Request, sessionId int64, trk view.TrackingHandler) err
 	}
 	referer := r.Header.Get("Referer")
 	go trk.HandleActionEvent(view.ActionEvent{
-		BaseEvent: &view.BaseEvent{Event: view.EVENT_ITEM_ACTION, SessionId: sessionId, TimeStamp: time.Now().Unix()},
+		BaseEvent: updateBaseEvent(r, &view.BaseEvent{Event: view.EVENT_ITEM_ACTION, SessionId: sessionId}),
 		BaseItem:  data.Item,
 		Action:    data.Action,
 		Reason:    data.Reason,
@@ -136,7 +150,7 @@ func TrackSuggest(r *http.Request, sessionId int64, trk view.TrackingHandler) er
 	}
 
 	go trk.HandleSuggestEvent(view.SuggestEvent{
-		BaseEvent:   &view.BaseEvent{Event: view.EVENT_SUGGEST, SessionId: sessionId, TimeStamp: time.Now().Unix()},
+		BaseEvent:   updateBaseEvent(r, &view.BaseEvent{Event: view.EVENT_SUGGEST, SessionId: sessionId}),
 		Value:       data.Value,
 		Suggestions: data.Suggestions,
 		Results:     data.Results,
@@ -177,7 +191,7 @@ func TrackCheckout(r *http.Request, sessionId int64, trk view.TrackingHandler) e
 	}
 
 	go trk.HandleEnterCheckout(view.EnterCheckoutEvent{
-		BaseEvent: &view.BaseEvent{Event: view.CART_ENTER_CHECKOUT, SessionId: sessionId, TimeStamp: time.Now().Unix()},
+		BaseEvent: updateBaseEvent(r, &view.BaseEvent{Event: view.CART_ENTER_CHECKOUT, SessionId: sessionId}),
 		Items:     data.Items,
 
 		//Referer:   referer,
@@ -197,7 +211,7 @@ func TrackCart(r *http.Request, sessionId int64, trk view.TrackingHandler) error
 	eventType := getCartEventType(data.Type)
 
 	go trk.HandleCartEvent(view.CartEvent{
-		BaseEvent: &view.BaseEvent{Event: eventType, SessionId: sessionId, TimeStamp: time.Now().Unix()},
+		BaseEvent: updateBaseEvent(r, &view.BaseEvent{Event: eventType, SessionId: sessionId}),
 		BaseItem:  data.BaseItem,
 		Type:      data.Type,
 		//Referer:   referer,
@@ -220,7 +234,7 @@ func TrackDataSet(r *http.Request, sessionId int64, trk view.TrackingHandler) er
 	}
 
 	go trk.HandleDataSetEvent(view.DataSetEvent{
-		BaseEvent: &view.BaseEvent{Event: view.EVENT_DATA_SET, SessionId: sessionId, TimeStamp: time.Now().Unix()},
+		BaseEvent: updateBaseEvent(r, &view.BaseEvent{Event: view.EVENT_DATA_SET, SessionId: sessionId}),
 		Query:     data.Query,
 		Positive:  data.Positive,
 		Negative:  data.Negative,
