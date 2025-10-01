@@ -166,7 +166,7 @@ func (session *SessionData) HandleEvent(event interface{}) map[string]float64 {
 		session.VisitedSkus = make([]uint, 0)
 	}
 	if session.Events == nil {
-		log.Printf("make new event-list, %s", session.Id)
+		log.Printf("make new event-list, %d", session.Id)
 		session.Events = make([]interface{}, 0)
 	}
 	if session.Groups == nil {
@@ -194,7 +194,7 @@ func (session *SessionData) HandleEvent(event interface{}) map[string]float64 {
 		} else {
 			log.Printf("Event without item %+v", event)
 		}
-		break
+
 	case SearchEvent:
 		for _, filter := range e.Filters.StringFilter {
 			session.FieldEvents.Add(filter.Id, DecayEvent{
@@ -208,7 +208,7 @@ func (session *SessionData) HandleEvent(event interface{}) map[string]float64 {
 				Value:     100,
 			})
 		}
-		break
+
 	case ImpressionEvent:
 		for _, impression := range e.Items {
 			session.ItemEvents.Add(impression.Id, DecayEvent{
@@ -217,13 +217,13 @@ func (session *SessionData) HandleEvent(event interface{}) map[string]float64 {
 			})
 			session.VisitedSkus = append(session.VisitedSkus, impression.Id)
 		}
-		break
+
 	case CartEvent:
 		session.ItemEvents.Add(e.Id, DecayEvent{
 			TimeStamp: now,
 			Value:     700,
 		})
-		break
+
 	case ActionEvent:
 		if e.BaseItem != nil && e.Id > 0 {
 			session.ItemEvents.Add(e.Id, DecayEvent{
@@ -231,7 +231,7 @@ func (session *SessionData) HandleEvent(event interface{}) map[string]float64 {
 				Value:     80,
 			})
 		}
-		break
+
 	case PurchaseEvent:
 		for _, purchase := range e.Items {
 			session.ItemEvents.Add(purchase.Id, DecayEvent{
@@ -239,9 +239,9 @@ func (session *SessionData) HandleEvent(event interface{}) map[string]float64 {
 				Value:     800 * float64(purchase.Quantity),
 			})
 		}
-		break
+
 	case SuggestEvent:
-		break
+
 	default:
 		log.Printf("Unknown event type %T", event)
 	}

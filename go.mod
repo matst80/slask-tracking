@@ -1,9 +1,9 @@
 module github.com/matst80/slask-tracking
 
-go 1.24.2
+go 1.25.1
 
 require (
-	github.com/matst80/slask-finder v0.0.0-20250927215415-5f71ff89d17a
+	github.com/matst80/slask-finder v0.0.0-20251001054432-9c1558528461
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rabbitmq/amqp091-go v1.10.0
 )
@@ -18,7 +18,7 @@ require (
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.66.1 // indirect
 	github.com/prometheus/procfs v0.17.0 // indirect
-	github.com/redis/go-redis/v9 v9.8.0 // indirect
+	github.com/redis/go-redis/v9 v9.14.0 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	golang.org/x/sys v0.36.0 // indirect

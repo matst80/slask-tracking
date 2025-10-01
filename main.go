@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/matst80/slask-finder/pkg/messaging"
+	"github.com/matst80/slask-tracking/pkg/events"
 	"github.com/matst80/slask-tracking/pkg/view"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -45,7 +46,12 @@ func run_application() int {
 	popularityHandler := view.NewSortOverrideStorage(conn)
 
 	defer viewHandler.Save()
-	//go client.Connect(viewHandler)
+	go func() {
+		err := events.ConnectTrackingHandler(ch, viewHandler)
+		if err != nil {
+			log.Printf("Failed to connect tracking handler: %v", err)
+		}
+	}()
 
 	viewHandler.ConnectPopularityListener(popularityHandler)
 	mux := http.NewServeMux()

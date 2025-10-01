@@ -4,47 +4,48 @@ import (
 	"encoding/json"
 	"log"
 
+	"github.com/matst80/slask-finder/pkg/messaging"
 	"github.com/matst80/slask-tracking/pkg/view"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-type RabbitTrackingConfig struct {
-	TrackingTopic string
-	//ItemsUpsertedTopic string
-	Url   string
-	VHost string
-}
+// type RabbitTrackingConfig struct {
+// 	TrackingTopic string
+// 	//ItemsUpsertedTopic string
+// 	Url   string
+// 	VHost string
+// }
 
-type RabbitTransportClient struct {
-	RabbitTrackingConfig
-}
+// type RabbitTransportClient struct {
+// 	conn *amqp.Connection
+// }
 
-func (t *RabbitTransportClient) declareBindAndConsume(ch *amqp.Channel, topic string) (<-chan amqp.Delivery, error) {
-	q, err := ch.QueueDeclare(
-		"",    // name
-		false, // durable
-		false, // delete when unused
-		true,  // exclusive
-		false, // no-wait
-		nil,   // arguments
-	)
-	if err != nil {
-		return nil, err
-	}
-	err = ch.QueueBind(q.Name, topic, topic, false, nil)
-	if err != nil {
-		return nil, err
-	}
-	return ch.Consume(
-		q.Name,
-		"",
-		true,
-		false,
-		false,
-		false,
-		nil,
-	)
-}
+// func (t *RabbitTransportClient) declareBindAndConsume(ch *amqp.Channel, topic string) (<-chan amqp.Delivery, error) {
+// 	q, err := ch.QueueDeclare(
+// 		"",    // name
+// 		false, // durable
+// 		false, // delete when unused
+// 		true,  // exclusive
+// 		false, // no-wait
+// 		nil,   // arguments
+// 	)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	err = ch.QueueBind(q.Name, topic, topic, false, nil)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return ch.Consume(
+// 		q.Name,
+// 		"",
+// 		true,
+// 		false,
+// 		false,
+// 		false,
+// 		nil,
+// 	)
+// }
 
 // func (t *RabbitTransportClient) ConnectUpdates(handler view.UpdateHandler) error {
 
@@ -102,34 +103,15 @@ func (t *RabbitTransportClient) declareBindAndConsume(ch *amqp.Channel, topic st
 // 	return nil
 // }
 
-func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
-	conn, err := amqp.DialConfig(t.Url, amqp.Config{
-		Vhost:      t.VHost,
-		Properties: amqp.NewConnectionProperties(),
-	})
+func ConnectTrackingHandler(ch *amqp.Channel, handler view.TrackingHandler) error {
 
-	if err != nil {
-		return err
-	}
-
-	ch, err := conn.Channel()
-	if err != nil {
-		return err
-	}
-
-	toAdd, err := t.declareBindAndConsume(ch, t.TrackingTopic)
-	if err != nil {
-		return err
-	}
-
-	var event view.BaseEvent
-	for d := range toAdd {
-
-		if err := json.Unmarshal(d.Body, &event); err == nil {
+	return messaging.ListenToTopic(ch, "global", "tracking", func(msg amqp.Delivery) error {
+		var event view.BaseEvent
+		if err := json.Unmarshal(msg.Body, &event); err == nil {
 			switch event.Event {
 			case 0:
 				var session view.Session
-				if err := json.Unmarshal(d.Body, &session); err == nil {
+				if err := json.Unmarshal(msg.Body, &session); err == nil {
 					session.SetTimestamp()
 					handler.HandleSessionEvent(session)
 				} else {
@@ -137,7 +119,7 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 				}
 			case 1:
 				var searchEventData view.SearchEvent
-				if err := json.Unmarshal(d.Body, &searchEventData); err == nil {
+				if err := json.Unmarshal(msg.Body, &searchEventData); err == nil {
 					searchEventData.SetTimestamp()
 					handler.HandleSearchEvent(searchEventData, nil)
 				} else {
@@ -145,7 +127,7 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 				}
 			case 2:
 				var event view.Event
-				if err := json.Unmarshal(d.Body, &event); err == nil {
+				if err := json.Unmarshal(msg.Body, &event); err == nil {
 					event.SetTimestamp()
 					handler.HandleEvent(event, nil)
 				} else {
@@ -153,7 +135,7 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 				}
 			case 3:
 				var cartEvent view.CartEvent
-				if err := json.Unmarshal(d.Body, &cartEvent); err == nil {
+				if err := json.Unmarshal(msg.Body, &cartEvent); err == nil {
 					cartEvent.SetTimestamp()
 					handler.HandleCartEvent(cartEvent, nil)
 				} else {
@@ -161,7 +143,7 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 				}
 			case 4:
 				var cartEvent view.CartEvent
-				if err := json.Unmarshal(d.Body, &cartEvent); err == nil {
+				if err := json.Unmarshal(msg.Body, &cartEvent); err == nil {
 					cartEvent.SetTimestamp()
 					handler.HandleCartEvent(cartEvent, nil)
 				} else {
@@ -169,7 +151,7 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 				}
 			case 5:
 				var impressionsEvent view.ImpressionEvent
-				if err := json.Unmarshal(d.Body, &impressionsEvent); err == nil {
+				if err := json.Unmarshal(msg.Body, &impressionsEvent); err == nil {
 					impressionsEvent.SetTimestamp()
 					handler.HandleImpressionEvent(impressionsEvent, nil)
 				} else {
@@ -177,11 +159,11 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 				}
 			case 6:
 				var actionEvent view.ActionEvent
-				if err := json.Unmarshal(d.Body, &actionEvent); err == nil {
+				if err := json.Unmarshal(msg.Body, &actionEvent); err == nil {
 					actionEvent.SetTimestamp()
 					handler.HandleActionEvent(actionEvent, nil)
 				} else {
-					log.Printf("Failed to unmarshal impressions event message %v", err)
+					log.Printf("Failed to unmarshal action event message %v", err)
 				}
 			default:
 				log.Printf("Unknown event type %v", event.Event)
@@ -190,7 +172,7 @@ func (t *RabbitTransportClient) Connect(handler view.TrackingHandler) error {
 		} else {
 			log.Printf("Failed to unmarshal upset message %v", err)
 		}
-	}
+		return nil
+	})
 
-	return nil
 }
