@@ -68,19 +68,19 @@ func (s *SortOverrideStorage) FieldPopularityChanged(sort *sorting.SortOverride)
 }
 
 func (s *SortOverrideStorage) SessionPopularityChanged(sessionId int64, sort *sorting.SortOverride) error {
-	s.diskStorage.SessionPopularityChanged(sessionId, sort)
-	return messaging.SendChange(s.conn, "global", "sort_override", types.SortOverrideUpdate{
-		Key:  fmt.Sprintf("session-%d", sessionId),
-		Data: *sort,
-	})
+	return s.diskStorage.SessionPopularityChanged(sessionId, sort)
+	// return messaging.SendChange(s.conn, "global", "sort_override", types.SortOverrideUpdate{
+	// 	Key:  fmt.Sprintf("session-%d", sessionId),
+	// 	Data: *sort,
+	// })
 }
 
 func (s *SortOverrideStorage) SessionFieldPopularityChanged(sessionId int64, sort *sorting.SortOverride) error {
-	s.diskStorage.SessionFieldPopularityChanged(sessionId, sort)
-	return messaging.SendChange(s.conn, "global", "field_sort_override", types.SortOverrideUpdate{
-		Key:  fmt.Sprintf("session-fields-%d", sessionId),
-		Data: *sort,
-	})
+	return s.diskStorage.SessionFieldPopularityChanged(sessionId, sort)
+	// return messaging.SendChange(s.conn, "global", "field_sort_override", types.SortOverrideUpdate{
+	// 	Key:  fmt.Sprintf("session-fields-%d", sessionId),
+	// 	Data: *sort,
+	// })
 }
 
 func (s *SortOverrideStorage) GroupPopularityChanged(groupId string, sort *sorting.SortOverride) error {
