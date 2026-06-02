@@ -4,7 +4,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/matst80/slask-finder/pkg/sorting"
 	"github.com/matst80/slask-finder/pkg/types"
 )
 
@@ -61,7 +60,7 @@ type Session struct {
 }
 
 type BaseItem struct {
-	Id        uint    `json:"id"`
+	Id        uint32  `json:"id"`
 	Position  float32 `json:"index"`
 	Category  string  `json:"item_category,omitempty"`
 	Category2 string  `json:"item_category2,omitempty"`
@@ -107,7 +106,7 @@ type CartEvent struct {
 }
 
 type Purchase struct {
-	Id       uint `json:"item"`
+	Id       uint32 `json:"item"`
 	Quantity uint `json:"quantity"`
 }
 
@@ -127,16 +126,16 @@ type SearchEvent struct {
 }
 
 type PopularityListener interface {
-	PopularityChanged(sort *sorting.SortOverride) error
-	FieldPopularityChanged(sort *sorting.SortOverride) error
-	SessionPopularityChanged(sessionId int64, sort *sorting.SortOverride) error
-	SessionFieldPopularityChanged(sessionId int64, sort *sorting.SortOverride) error
-	GroupPopularityChanged(groupId string, sort *sorting.SortOverride) error
-	GroupFieldPopularityChanged(groupId string, sort *sorting.SortOverride) error
+	PopularityChanged(sort *types.SortOverride) error
+	FieldPopularityChanged(sort *types.SortOverride) error
+	SessionPopularityChanged(sessionId int64, group string, sort *types.SortOverride) error
+	SessionFieldPopularityChanged(sessionId int64, sort *types.SortOverride) error
+	GroupPopularityChanged(groupId string, sort *types.SortOverride) error
+	GroupFieldPopularityChanged(groupId string, sort *types.SortOverride) error
 }
 
 type Impression struct {
-	Id       uint    `json:"id"`
+	Id       uint32  `json:"id"`
 	Position float32 `json:"position"`
 }
 

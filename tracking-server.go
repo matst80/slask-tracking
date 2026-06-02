@@ -67,7 +67,7 @@ func TrackClick(r *http.Request, sessionId int64, trk view.TrackingHandler) erro
 	go trk.HandleEvent(view.Event{
 		BaseEvent: updateBaseEvent(r, &view.BaseEvent{Event: view.EVENT_ITEM_CLICK, SessionId: sessionId}),
 		BaseItem: &view.BaseItem{
-			Id:       uint(itemId),
+			Id:       uint32(itemId),
 			Position: float32(position),
 		},
 		//Referer:   referer,

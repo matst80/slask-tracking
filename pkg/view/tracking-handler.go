@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/matst80/slask-finder/pkg/sorting"
+	"github.com/matst80/slask-finder/pkg/types"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -36,7 +36,7 @@ type FacetValueResult struct {
 }
 
 type FacetResult struct {
-	FacetId uint               `json:"id"`
+	FacetId uint32             `json:"id"`
 	Score   float64            `json:"score"`
 	Values  []FacetValueResult `json:"values"`
 }
@@ -55,10 +55,10 @@ type QueryKeyData struct {
 type QueryMatcher struct {
 	Popularity *DecayPopularity `json:"popularity"`
 	//	Query      string                `json:"query"`
-	KeyFields map[uint]QueryKeyData `json:"keyFacets"`
+	KeyFields map[uint32]QueryKeyData `json:"keyFacets"`
 }
 
-func (q *QueryMatcher) AddKeyFilterEvent(key uint, value string) {
+func (q *QueryMatcher) AddKeyFilterEvent(key uint32, value string) {
 	ts := time.Now().Unix()
 	popularity, ok := q.KeyFields[key]
 	if !ok {
@@ -87,8 +87,8 @@ func (q *QueryMatcher) AddKeyFilterEvent(key uint, value string) {
 }
 
 type ProductRelation struct {
-	ItemId uint               `json:"item_id"`
-	Other  map[uint]DecayList `json:"other"`
+	ItemId uint32             `json:"item_id"`
+	Other  map[uint32]DecayList `json:"other"`
 }
 
 type PersistentMemoryTrackingHandler struct {
@@ -98,19 +98,24 @@ type PersistentMemoryTrackingHandler struct {
 	updatesToKeep         int
 	trackingHandler       PopularityListener
 	followers             []TrackingHandler
-	ViewedTogether        map[uint]ProductRelation             `json:"viewed_together"`
-	AlsoBought            map[uint]ProductRelation             `json:"also_bought"`
+	boltStorage           *BoltStorage
+	aofLogger             *AOFLogger
+	eventChan             chan func()
+	decayers              []Decayer
+	Config                TrackingConfig                       `json:"tracking_config"`
+	ViewedTogether        map[uint32]ProductRelation             `json:"viewed_together"`
+	AlsoBought            map[uint32]ProductRelation             `json:"also_bought"`
 	DataSet               []DataSetEvent                       `json:"dataset"`
-	FieldValueScores      map[uint][]FacetValueResult          `json:"field_value_scores"`
-	ItemPopularity        sorting.SortOverride                 `json:"item_popularity"`
+	FieldValueScores      map[uint32][]FacetValueResult          `json:"field_value_scores"`
+	ItemPopularity        types.SortOverride                 `json:"item_popularity"`
 	Queries               map[string]uint                      `json:"queries"`
 	QueryEvents           map[string]QueryMatcher              `json:"suggestions"`
 	Sessions              map[int64]*SessionData               `json:"sessions"`
-	FieldPopularity       sorting.SortOverride                 `json:"field_popularity"`
+	FieldPopularity       types.SortOverride                 `json:"field_popularity"`
 	ItemEvents            DecayList                            `json:"item_events"`
 	FieldEvents           DecayList                            `json:"field_events"`
 	SortedQueries         []QueryResult                        `json:"sorted_queries"`
-	FieldValueEvents      map[uint]map[string]*DecayPopularity `json:"field_value_events"`
+	FieldValueEvents      map[uint32]map[string]*DecayPopularity `json:"field_value_events"`
 	Funnels               []Funnel                             `json:"funnel_storage"`
 	EmptyResults          []SearchEvent                        `json:"empty_results_v2"`
 	PersonalizationGroups map[string]PersonalizationGroup      `json:"personalization_groups"`
@@ -119,7 +124,7 @@ type PersistentMemoryTrackingHandler struct {
 
 type SessionData struct {
 	*SessionContent
-	VisitedSkus []uint                 `json:"visited_skus"`
+	VisitedSkus []uint32                 `json:"visited_skus"`
 	Groups      map[string]float64     `json:"groups"`
 	Variations  map[string]interface{} `json:"variations"`
 	// ItemPopularity  index.SortOverride     `json:"item_popularity"`
@@ -152,15 +157,15 @@ func (session *SessionData) HandleVariation(id string) (interface{}, error) {
 
 }
 
-func (session *SessionData) HandleEvent(event interface{}) map[string]float64 {
+func (session *SessionData) HandleEvent(event interface{}, cfg *TrackingConfig) map[string]float64 {
 	if session.ItemEvents == nil {
-		session.ItemEvents = make(map[uint][]DecayEvent)
+		session.ItemEvents = make(map[uint32][]DecayEvent)
 	}
 	if session.FieldEvents == nil {
-		session.FieldEvents = make(map[uint][]DecayEvent)
+		session.FieldEvents = make(map[uint32][]DecayEvent)
 	}
 	if session.VisitedSkus == nil {
-		session.VisitedSkus = make([]uint, 0)
+		session.VisitedSkus = make([]uint32, 0)
 	}
 	if session.Events == nil {
 		log.Printf("make new event-list, %d", session.Id)
@@ -181,12 +186,47 @@ func (session *SessionData) HandleEvent(event interface{}) map[string]float64 {
 				TimeStamp: now,
 				Value:     200,
 			})
-			if e.BaseItem.Category == "Gaming" {
-				session.Groups["gamer"] += 5
-			} else if e.BaseItem.Category3 == "TV" {
-				session.Groups["tv"] += 5
-			} else if e.BaseItem.Brand == "Apple" {
-				session.Groups["apple"] += 3
+			if cfg != nil {
+				for _, rule := range cfg.PersonaRules {
+					matched := true
+					for field, value := range rule.Conditions {
+						switch field {
+						case "category":
+							if e.BaseItem.Category != value {
+								matched = false
+							}
+						case "category2":
+							if e.BaseItem.Category2 != value {
+								matched = false
+							}
+						case "category3":
+							if e.BaseItem.Category3 != value {
+								matched = false
+							}
+						case "category4":
+							if e.BaseItem.Category4 != value {
+								matched = false
+							}
+						case "category5":
+							if e.BaseItem.Category5 != value {
+								matched = false
+							}
+						case "brand":
+							if e.BaseItem.Brand != value {
+								matched = false
+							}
+						case "name":
+							if e.BaseItem.Name != value {
+								matched = false
+							}
+						default:
+							matched = false
+						}
+					}
+					if matched {
+						session.Groups[rule.Persona] += rule.Points
+					}
+				}
 			}
 		} else {
 			log.Printf("Event without item %+v", event)
@@ -194,13 +234,13 @@ func (session *SessionData) HandleEvent(event interface{}) map[string]float64 {
 
 	case SearchEvent:
 		for _, filter := range e.Filters.StringFilter {
-			session.FieldEvents.Add(filter.Id, DecayEvent{
+			session.FieldEvents.Add(uint32(filter.Id), DecayEvent{
 				TimeStamp: now,
 				Value:     150,
 			})
 		}
 		for _, filter := range e.Filters.RangeFilter {
-			session.FieldEvents.Add(filter.Id, DecayEvent{
+			session.FieldEvents.Add(uint32(filter.Id), DecayEvent{
 				TimeStamp: now,
 				Value:     100,
 			})
@@ -295,86 +335,138 @@ func (s *PersistentMemoryTrackingHandler) dispatchFollowers(dispatch func(Tracki
 }
 
 func MakeMemoryTrackingHandler(path string, itemsToKeep int) *PersistentMemoryTrackingHandler {
+	boltStorage, err := NewBoltStorage(path + ".db")
+	if err != nil {
+		log.Fatalf("Failed to open BoltDB storage: %v", err)
+	}
+
+	aofLogger, err := NewAOFLogger(path + ".aof")
+	if err != nil {
+		log.Fatalf("Failed to initialize AOF logger: %v", err)
+	}
 
 	instance := &PersistentMemoryTrackingHandler{
-		path:             "data",
+		path:             path,
 		mu:               sync.RWMutex{},
 		changes:          0,
-		updatesToKeep:    0,
+		updatesToKeep:    itemsToKeep,
 		trackingHandler:  nil,
 		followers:        make([]TrackingHandler, 0),
-		ViewedTogether:   make(map[uint]ProductRelation),
-		AlsoBought:       make(map[uint]ProductRelation),
+		boltStorage:      boltStorage,
+		aofLogger:        aofLogger,
+		eventChan:        make(chan func(), 10000),
+		ViewedTogether:   make(map[uint32]ProductRelation),
+		AlsoBought:       make(map[uint32]ProductRelation),
 		DataSet:          make([]DataSetEvent, 0),
 		EmptyResults:     make([]SearchEvent, 0),
 		QueryEvents:      make(map[string]QueryMatcher),
-		ItemPopularity:   make(sorting.SortOverride),
+		ItemPopularity:   make(types.SortOverride),
 		Queries:          make(map[string]uint),
 		Sessions:         make(map[int64]*SessionData),
-		FieldPopularity:  make(sorting.SortOverride),
-		ItemEvents:       map[uint][]DecayEvent{},
-		FieldEvents:      map[uint][]DecayEvent{},
-		FieldValueEvents: make(map[uint]map[string]*DecayPopularity),
+		FieldPopularity:  make(types.SortOverride),
+		ItemEvents:       map[uint32][]DecayEvent{},
+		FieldEvents:      map[uint32][]DecayEvent{},
+		FieldValueEvents: make(map[uint32]map[string]*DecayPopularity),
 		Funnels:          make([]Funnel, 0),
 		SortedQueries:    make([]QueryResult, 0),
-		FieldValueScores: make(map[uint][]FacetValueResult),
+		FieldValueScores: make(map[uint32][]FacetValueResult),
 		PersonalizationGroups: map[string]PersonalizationGroup{
 			"gamer": {
 				Id:          "gamer",
 				Name:        "Gamer",
-				ItemEvents:  make(map[uint][]DecayEvent),
-				FieldEvents: make(map[uint][]DecayEvent),
+				ItemEvents:  make(map[uint32][]DecayEvent),
+				FieldEvents: make(map[uint32][]DecayEvent),
 			},
 			"tv": {
 				Id:          "tv",
 				Name:        "TV",
-				ItemEvents:  make(map[uint][]DecayEvent),
-				FieldEvents: make(map[uint][]DecayEvent),
+				ItemEvents:  make(map[uint32][]DecayEvent),
+				FieldEvents: make(map[uint32][]DecayEvent),
 			},
 			"apple": {
 				Id:          "apple",
 				Name:        "Apple",
-				ItemEvents:  make(map[uint][]DecayEvent),
-				FieldEvents: make(map[uint][]DecayEvent),
+				ItemEvents:  make(map[uint32][]DecayEvent),
+				FieldEvents: make(map[uint32][]DecayEvent),
 			},
 		},
-		//UpdatedItems:    make([]interface{}, 0),
 	}
 
-	err := load(path, instance)
-
-	if err != nil {
-		log.Printf("Error loading tracking data: %s", err)
+	instance.decayers = []Decayer{
+		&GlobalEventsDecayer{handler: instance},
+		&SuggestionDecayer{handler: instance},
+		&SessionDecayer{handler: instance},
+		&GroupDecayer{handler: instance},
+		&FacetValuesDecayer{handler: instance},
 	}
+
+	// Start single-threaded event loop
 	go func() {
-		for range time.Tick(time.Minute) {
-			if instance.changes > 0 {
-				err := instance.save()
-				if err != nil {
-					log.Println(err)
-				}
-			}
+		for f := range instance.eventChan {
+			f()
 		}
 	}()
 
-	instance.path = path
-	instance.changes = 0
-	instance.updatesToKeep = itemsToKeep
+	// Try loading metadata from BoltDB.
+	err = instance.loadMetaFromBolt()
+	if err != nil {
+		// Fallback to load JSON and migrate.
+		log.Printf("Metadata not in BoltDB. Attempting to migrate from JSON checkpoint %s: %v", path, err)
+		instance.Config = DefaultConfig()
+		if errLoad := loadOldJSON(path, instance); errLoad == nil {
+			log.Printf("Successfully loaded legacy JSON. Migrating to BoltDB...")
+			instance.saveMetaToBolt()
+			for _, session := range instance.Sessions {
+				boltStorage.SaveSession(session)
+			}
+		} else {
+			log.Printf("No legacy JSON checkpoint found or failed to load: %v. Starting fresh.", errLoad)
+			instance.saveMetaToBolt()
+		}
+	} else {
+		// Load sessions cache from BoltDB.
+		if sess, errSess := boltStorage.GetAllSessions(); errSess == nil {
+			instance.Sessions = sess
+		} else {
+			log.Printf("Error loading sessions from BoltDB: %v", errSess)
+		}
+	}
+
+	// Replay AOF log to apply any uncheckpointed events.
+	if errReplay := ReplayAOF(path+".aof", instance); errReplay != nil {
+		log.Printf("Error replaying AOF file: %v", errReplay)
+	}
+
+	go func() {
+		for range time.Tick(time.Minute) {
+			if instance.changes > 0 {
+				instance.Save()
+			}
+		}
+	}()
 
 	return instance
 }
 
 func (s *PersistentMemoryTrackingHandler) Save() {
-	s.save()
+	done := make(chan struct{})
+	s.eventChan <- func() {
+		s.save()
+		close(done)
+	}
+	<-done
 }
 
 func (s *PersistentMemoryTrackingHandler) save() error {
-	s.DecaySuggestions()
-	s.DecayEvents()
+	now := time.Now().Unix()
 
-	s.DecaySessionEvents()
+	for _, decayer := range s.decayers {
+		if err := decayer.Decay(now); err != nil {
+			log.Printf("Decay error: %v", err)
+		}
+	}
+
 	s.cleanSessions()
-	s.DecayFacetValuesEvents()
 
 	defer runtime.GC()
 	if s.changes == 0 {
@@ -385,15 +477,74 @@ func (s *PersistentMemoryTrackingHandler) save() error {
 		go s.trackingHandler.FieldPopularityChanged(&s.FieldPopularity)
 	}
 
-	log.Println("Saving tracking data")
+	log.Println("Saving metadata checkpoint to BoltDB and truncating AOF")
 
 	s.changes = 0
-	err := s.writeFile(s.path)
+	err := s.saveMetaToBolt()
+	if err != nil {
+		log.Printf("Failed to save metadata to BoltDB: %v", err)
+	}
+
+	if errAof := s.aofLogger.Truncate(); errAof != nil {
+		log.Printf("Failed to truncate AOF file: %v", errAof)
+	}
 
 	return err
 }
 
-func load(path string, result *PersistentMemoryTrackingHandler) error {
+func (s *PersistentMemoryTrackingHandler) loadMetaFromBolt() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	err := s.boltStorage.LoadMeta("viewed_together", &s.ViewedTogether)
+	if err != nil {
+		return err
+	}
+	s.boltStorage.LoadMeta("also_bought", &s.AlsoBought)
+	s.boltStorage.LoadMeta("dataset", &s.DataSet)
+	s.boltStorage.LoadMeta("field_value_scores", &s.FieldValueScores)
+	s.boltStorage.LoadMeta("item_popularity", &s.ItemPopularity)
+	s.boltStorage.LoadMeta("queries", &s.Queries)
+	s.boltStorage.LoadMeta("suggestions", &s.QueryEvents)
+	s.boltStorage.LoadMeta("field_popularity", &s.FieldPopularity)
+	s.boltStorage.LoadMeta("item_events", &s.ItemEvents)
+	s.boltStorage.LoadMeta("field_events", &s.FieldEvents)
+	s.boltStorage.LoadMeta("sorted_queries", &s.SortedQueries)
+	s.boltStorage.LoadMeta("field_value_events", &s.FieldValueEvents)
+	s.boltStorage.LoadMeta("funnel_storage", &s.Funnels)
+	s.boltStorage.LoadMeta("empty_results_v2", &s.EmptyResults)
+	s.boltStorage.LoadMeta("personalization_groups", &s.PersonalizationGroups)
+
+	if errCfg := s.boltStorage.LoadMeta("tracking_config", &s.Config); errCfg != nil {
+		s.Config = DefaultConfig()
+	}
+	return nil
+}
+
+func (s *PersistentMemoryTrackingHandler) saveMetaToBolt() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.boltStorage.SaveMeta("viewed_together", s.ViewedTogether)
+	s.boltStorage.SaveMeta("also_bought", s.AlsoBought)
+	s.boltStorage.SaveMeta("dataset", s.DataSet)
+	s.boltStorage.SaveMeta("field_value_scores", s.FieldValueScores)
+	s.boltStorage.SaveMeta("item_popularity", s.ItemPopularity)
+	s.boltStorage.SaveMeta("queries", s.Queries)
+	s.boltStorage.SaveMeta("suggestions", s.QueryEvents)
+	s.boltStorage.SaveMeta("field_popularity", s.FieldPopularity)
+	s.boltStorage.SaveMeta("item_events", s.ItemEvents)
+	s.boltStorage.SaveMeta("field_events", s.FieldEvents)
+	s.boltStorage.SaveMeta("sorted_queries", s.SortedQueries)
+	s.boltStorage.SaveMeta("field_value_events", s.FieldValueEvents)
+	s.boltStorage.SaveMeta("funnel_storage", s.Funnels)
+	s.boltStorage.SaveMeta("empty_results_v2", s.EmptyResults)
+	s.boltStorage.SaveMeta("personalization_groups", s.PersonalizationGroups)
+	s.boltStorage.SaveMeta("tracking_config", s.Config)
+	return nil
+}
+
+func loadOldJSON(path string, result *PersistentMemoryTrackingHandler) error {
 	file, err := os.Open(path)
 	if err != nil {
 		return err
@@ -401,32 +552,30 @@ func load(path string, result *PersistentMemoryTrackingHandler) error {
 	defer file.Close()
 
 	err = json.NewDecoder(file).Decode(result)
-	// tmp since the fields does not exist in the json
 	if result.ViewedTogether == nil {
-		result.ViewedTogether = make(map[uint]ProductRelation)
+		result.ViewedTogether = make(map[uint32]ProductRelation)
 	}
 	if result.AlsoBought == nil {
-		result.AlsoBought = make(map[uint]ProductRelation)
+		result.AlsoBought = make(map[uint32]ProductRelation)
 	}
 	return err
 }
 
 func (s *PersistentMemoryTrackingHandler) Clear() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	log.Println("Clearing tracking data??")
-	//s.changes++
-	//s.Sessions = make(map[int64]*SessionData)
-	//s.ItemEvents = map[uint][]DecayEvent{}
-	//s.FieldEvents = map[uint][]DecayEvent{}
-	//s.EmptyResults = make([]SearchEvent, 0)
+	s.eventChan <- func() {
+		log.Println("Clearing tracking data")
+		s.changes++
+		s.Sessions = make(map[int64]*SessionData)
+		s.ItemEvents = map[uint32][]DecayEvent{}
+		s.FieldEvents = map[uint32][]DecayEvent{}
+		s.EmptyResults = make([]SearchEvent, 0)
+		s.saveMetaToBolt()
+	}
 }
 
 func (s *PersistentMemoryTrackingHandler) GetSession(sessionId int64) *SessionData {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	session, ok := s.Sessions[sessionId]
-	if ok {
+	session, err := s.boltStorage.GetSession(sessionId)
+	if err == nil && session != nil {
 		return session
 	}
 	return nil
@@ -464,7 +613,7 @@ func (s *PersistentMemoryTrackingHandler) GetItemEvents() DecayList {
 	return s.ItemEvents
 }
 
-func (s *PersistentMemoryTrackingHandler) GetItemPopularity() map[uint]float64 {
+func (s *PersistentMemoryTrackingHandler) GetItemPopularity() types.SortOverride {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.ItemPopularity
@@ -534,7 +683,7 @@ func (s *PersistentMemoryTrackingHandler) GetSessions() []SessionOverview {
 	return sessions[:i]
 }
 
-func (s *PersistentMemoryTrackingHandler) GetFieldPopularity() sorting.SortOverride {
+func (s *PersistentMemoryTrackingHandler) GetFieldPopularity() types.SortOverride {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.FieldPopularity
@@ -546,7 +695,7 @@ func (s *PersistentMemoryTrackingHandler) GetDataSet() []DataSetEvent {
 	return s.DataSet
 }
 
-func (s *PersistentMemoryTrackingHandler) GetFieldValuePopularity(id uint) interface{} {
+func (s *PersistentMemoryTrackingHandler) GetFieldValuePopularity(id uint32) interface{} {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	values, ok := s.FieldValueScores[id]
@@ -560,48 +709,36 @@ func (s *PersistentMemoryTrackingHandler) HandleSessionEvent(event Session) {
 	s.dispatchFollowers(func(handler TrackingHandler) {
 		handler.HandleSessionEvent(event)
 	})
-	// log.Printf("Session new session event %d", event.SessionId)
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.changes++
-	opsProcessed.Inc()
-
-	//events := make([]interface{}, 0)
-	s.updateSession(event, event.SessionId, nil)
-	// s.Sessions[event.SessionId] = &SessionData{
-	// 	SessionContent: &event.SessionContent,
-	// 	Created:        time.Now().Unix(),
-	// 	LastUpdate:     time.Now().Unix(),
-	// 	Events:         events,
-	// 	VisitedSkus:    make([]string, 0),
-	// 	Id:             event.SessionId,
-	// 	ItemEvents:     make(map[uint][]DecayEvent),
-	// 	FieldEvents:    make(map[uint][]DecayEvent),
-	// }
+	s.aofLogger.LogEvent(EVENT_SESSION_START, event)
+	s.eventChan <- func() {
+		s.changes++
+		opsProcessed.Inc()
+		s.updateSession(event, event.SessionId, nil)
+	}
 }
 
 func (s *PersistentMemoryTrackingHandler) HandleEvent(event Event, r *http.Request) {
 	s.dispatchFollowers(func(handler TrackingHandler) {
 		handler.HandleEvent(event, r)
 	})
-	// log.Printf("Event SessionId: %d, ItemId: %d, Position: %f", event.SessionId, event.Item, event.Position)
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.ItemEvents.Add(event.Id, DecayEvent{
-		TimeStamp: time.Now().Unix(),
-		Value:     200.0 + (0.1 * float64(min(event.Position, 300))),
-	})
+	s.aofLogger.LogEvent(EVENT_ITEM_CLICK, event)
+	s.eventChan <- func() {
+		s.ItemEvents.Add(event.Id, DecayEvent{
+			TimeStamp: time.Now().Unix(),
+			Value:     s.Config.CalculateEventValue(EVENT_ITEM_CLICK, event.BaseItem),
+		})
 
-	go s.handleFunnels(&event)
-	s.updateSession(event, event.SessionId, r)
+		s.handleFunnels(&event)
+		s.updateSession(event, event.SessionId, r)
 
-	s.changes++
-	go opsProcessed.Inc()
+		s.changes++
+		opsProcessed.Inc()
+	}
 }
 
 func (s *PersistentMemoryTrackingHandler) handleFunnels(event TrackingEvent) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	for _, funnel := range s.Funnels {
 		funnel.ProcessEvent(event)
 	}
@@ -623,7 +760,7 @@ func (s *PersistentMemoryTrackingHandler) handleLinkedProducts(session *SessionD
 				if !ok {
 					viewedRelation = ProductRelation{
 						ItemId: viewed,
-						Other:  make(map[uint]DecayList),
+						Other:  make(map[uint32]DecayList),
 					}
 					list := make(DecayList, 0)
 					list.Add(e.Id, DecayEvent{
@@ -644,49 +781,48 @@ func (s *PersistentMemoryTrackingHandler) HandleEnterCheckout(event EnterCheckou
 	s.dispatchFollowers(func(handler TrackingHandler) {
 		handler.HandleEnterCheckout(event, r)
 	})
-	// log.Printf("EnterCheckout event SessionId: %d, ItemId: %d, Quantity: %d", event.SessionId, event.Item, event.Quantity)
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for _, item := range event.Items {
-		s.ItemEvents.Add(item.Id, DecayEvent{
-			TimeStamp: time.Now().Unix(),
-			Value:     200.0 * float64(item.Quantity),
-		})
+	s.aofLogger.LogEvent(CART_ENTER_CHECKOUT, event)
+	s.eventChan <- func() {
+		for _, item := range event.Items {
+			s.ItemEvents.Add(item.Id, DecayEvent{
+				TimeStamp: time.Now().Unix(),
+				Value:     s.Config.CalculateEventValue(CART_ENTER_CHECKOUT, &item),
+			})
+		}
+		s.changes++
+		opsProcessed.Inc()
+		s.handleFunnels(&event)
+		s.updateSession(event, event.SessionId, r)
 	}
-	s.changes++
-	go opsProcessed.Inc()
-	go s.handleFunnels(&event)
-	s.updateSession(event, event.SessionId, r)
 }
 
 func (s *PersistentMemoryTrackingHandler) HandleCartEvent(event CartEvent, r *http.Request) {
 	s.dispatchFollowers(func(handler TrackingHandler) {
 		handler.HandleCartEvent(event, r)
 	})
-	// log.Printf("Cart event SessionId: %d, ItemId: %d, Quantity: %d", event.SessionId, event.Item, event.Quantity)
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.ItemEvents.Add(event.Id, DecayEvent{
-		TimeStamp: time.Now().Unix(),
-		Value:     190.0 * float64(event.Quantity),
-	})
-	s.changes++
-	go opsProcessed.Inc()
-	go s.handleFunnels(&event)
-	s.updateSession(event, event.SessionId, r)
+	s.aofLogger.LogEvent(event.Event, event)
+	s.eventChan <- func() {
+		s.ItemEvents.Add(event.Id, DecayEvent{
+			TimeStamp: time.Now().Unix(),
+			Value:     s.Config.CalculateEventValue(event.Event, event.BaseItem),
+		})
+		s.changes++
+		opsProcessed.Inc()
+		s.handleFunnels(&event)
+		s.updateSession(event, event.SessionId, r)
+	}
 }
 
 func (s *PersistentMemoryTrackingHandler) HandleDataSetEvent(event DataSetEvent, r *http.Request) {
 	s.dispatchFollowers(func(handler TrackingHandler) {
 		handler.HandleDataSetEvent(event, r)
 	})
-	// log.Printf("DataSet event SessionId: %d, Query: %d, Positive: %s, Negative: %s", event.SessionId, event.Query, event.Positive, event.Negative)
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.changes++
-	go opsProcessed.Inc()
-
-	s.DataSet = append(s.DataSet, event)
+	s.aofLogger.LogEvent(EVENT_DATA_SET, event)
+	s.eventChan <- func() {
+		s.changes++
+		opsProcessed.Inc()
+		s.DataSet = append(s.DataSet, event)
+	}
 }
 
 func normalizeQuery(query string) string {
@@ -696,76 +832,68 @@ func normalizeQuery(query string) string {
 }
 
 func (s *PersistentMemoryTrackingHandler) UpdateSessionFromRequest(sessionId int64, r *http.Request) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	session, ok := s.Sessions[sessionId]
-	if ok {
-		session.Ip = r.RemoteAddr
-		s.Sessions[sessionId] = session
+	s.eventChan <- func() {
+		session, ok := s.Sessions[sessionId]
+		if ok {
+			session.Ip = r.RemoteAddr
+			s.boltStorage.SaveSession(session)
+		}
 	}
-
 }
 
 func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEvent, r *http.Request) {
 	s.dispatchFollowers(func(handler TrackingHandler) {
 		handler.HandleSearchEvent(event, r)
 	})
-	if event.NumberOfResults == 0 {
-		if s.EmptyResults == nil {
-			s.EmptyResults = make([]SearchEvent, 0)
-		}
-		if event.Query != "" {
-			s.EmptyResults = append(s.EmptyResults, event)
-			log.Printf("Search event with no results %+v", event)
-		}
-
-		return
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.changes++
-	go opsProcessed.Inc()
-	ts := time.Now().Unix()
-
-	if event.Query != "" && event.Query != "*" {
-		normalizedQuery := normalizeQuery(event.Query)
-		s.Queries[normalizedQuery] += 1
-
-		if normalizedQuery != "" {
-			queryEvents, ok := s.QueryEvents[normalizedQuery]
-			if !ok {
-				queryEvents = QueryMatcher{
-					//Query:      event.Query,
-					Popularity: &DecayPopularity{},
-					KeyFields:  make(map[uint]QueryKeyData),
-				}
-				s.QueryEvents[normalizedQuery] = queryEvents
+	s.aofLogger.LogEvent(EVENT_SEARCH, event)
+	s.eventChan <- func() {
+		if event.NumberOfResults == 0 {
+			if s.EmptyResults == nil {
+				s.EmptyResults = make([]SearchEvent, 0)
 			}
-			queryEvents.Popularity.Add(DecayEvent{
-				TimeStamp: ts,
-				Value:     20.0, // + (float64(event.NumberOfResults) * 0.5),
-			})
-			//queryEvents.Popularity.Decay(ts)
-			for _, filter := range event.Filters.StringFilter {
-
-				for _, value := range filter.Value {
-					queryEvents.AddKeyFilterEvent(filter.Id, value)
-				}
-
+			if event.Query != "" {
+				s.EmptyResults = append(s.EmptyResults, event)
+				log.Printf("Search event with no results %+v", event)
 			}
+			return
 		}
-	} else {
+		s.changes++
+		opsProcessed.Inc()
+		ts := time.Now().Unix()
 
-		for _, filter := range event.Filters.StringFilter {
-			s.FieldEvents.Add(filter.Id, DecayEvent{
-				TimeStamp: ts,
-				Value:     40.0,
-			})
+		if event.Query != "" && event.Query != "*" {
+			normalizedQuery := normalizeQuery(event.Query)
+			s.Queries[normalizedQuery] += 1
+
+			if normalizedQuery != "" {
+				queryEvents, ok := s.QueryEvents[normalizedQuery]
+				if !ok {
+					queryEvents = QueryMatcher{
+						Popularity: &DecayPopularity{},
+						KeyFields:  make(map[uint32]QueryKeyData),
+					}
+					s.QueryEvents[normalizedQuery] = queryEvents
+				}
+				queryEvents.Popularity.Add(DecayEvent{
+					TimeStamp: ts,
+					Value:     s.Config.CalculateEventValue(EVENT_SEARCH, nil),
+				})
+				for _, filter := range event.Filters.StringFilter {
+					for _, value := range filter.Value {
+						queryEvents.AddKeyFilterEvent(uint32(filter.Id), value)
+					}
+				}
+			}
+		} else {
 			for _, filter := range event.Filters.StringFilter {
-				fieldValues, ok := s.FieldValueEvents[filter.Id]
+				s.FieldEvents.Add(uint32(filter.Id), DecayEvent{
+					TimeStamp: ts,
+					Value:     40.0,
+				})
+				fieldValues, ok := s.FieldValueEvents[uint32(filter.Id)]
 				if !ok {
 					fieldValues = make(map[string]*DecayPopularity)
-					s.FieldValueEvents[filter.Id] = fieldValues
+					s.FieldValueEvents[uint32(filter.Id)] = fieldValues
 				}
 				addFieldValueEvent := func(value string) {
 					fieldPopularity, ok := fieldValues[value]
@@ -782,24 +910,21 @@ func (s *PersistentMemoryTrackingHandler) HandleSearchEvent(event SearchEvent, r
 				for _, value := range filter.Value {
 					addFieldValueEvent(value)
 				}
-
+			}
+			for _, filter := range event.Filters.RangeFilter {
+				s.FieldEvents.Add(uint32(filter.Id), DecayEvent{
+					TimeStamp: ts,
+					Value:     30,
+				})
 			}
 		}
-		for _, filter := range event.Filters.RangeFilter {
-			s.FieldEvents.Add(filter.Id, DecayEvent{
-				TimeStamp: ts,
-				Value:     30,
-			})
-		}
+
+		s.handleFunnels(&event)
+		s.updateSession(event, event.SessionId, r)
 	}
-
-	go s.handleFunnels(&event)
-	s.updateSession(event, event.SessionId, r)
-
 }
 
 func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessionId int64, r *http.Request) *SessionData {
-
 	session, ok := s.Sessions[sessionId]
 	now := time.Now().Unix()
 	log.Printf("handling session event %T, session found %v, id: %d", event, ok, sessionId)
@@ -811,10 +936,10 @@ func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessi
 			LastUpdate:     now,
 			LastSync:       0,
 			Id:             sessionId,
-			VisitedSkus:    make([]uint, 0),
+			VisitedSkus:    make([]uint32, 0),
 			Events:         make([]interface{}, 0),
-			ItemEvents:     make(map[uint][]DecayEvent),
-			FieldEvents:    make(map[uint][]DecayEvent),
+			ItemEvents:     make(map[uint32][]DecayEvent),
+			FieldEvents:    make(map[uint32][]DecayEvent),
 		}
 		s.Sessions[sessionId] = session
 	} else {
@@ -824,7 +949,7 @@ func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessi
 		}
 	}
 
-	user_groups := session.HandleEvent(event)
+	user_groups := session.HandleEvent(event, &s.Config)
 	for group, value := range user_groups {
 		if group != "" && value > 0 {
 			if mainGroup, ok := s.PersonalizationGroups[group]; ok {
@@ -832,60 +957,69 @@ func (s *PersistentMemoryTrackingHandler) updateSession(event interface{}, sessi
 			}
 		}
 	}
-	return s.Sessions[sessionId]
+	s.boltStorage.SaveSession(session)
+	return session
 }
 
 func (s *PersistentMemoryTrackingHandler) HandleImpressionEvent(event ImpressionEvent, r *http.Request) {
 	s.dispatchFollowers(func(handler TrackingHandler) {
 		handler.HandleImpressionEvent(event, r)
 	})
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	go opsProcessed.Inc()
-	for _, impression := range event.Items {
-		s.ItemEvents.Add(impression.Id, DecayEvent{
-			TimeStamp: time.Now().Unix(),
-			Value:     float64(impression.Position),
-		})
-		//s.ItemPopularity[impression.Id] += 5.01 + float64(impression.Position)/10
+	s.aofLogger.LogEvent(EVENT_ITEM_IMPRESS, event)
+	s.eventChan <- func() {
+		opsProcessed.Inc()
+		for _, impression := range event.Items {
+			s.ItemEvents.Add(impression.Id, DecayEvent{
+				TimeStamp: time.Now().Unix(),
+				Value:     s.Config.CalculateEventValue(EVENT_ITEM_IMPRESS, &impression),
+			})
+		}
+		s.updateSession(event, event.SessionId, r)
+		s.handleFunnels(&event)
+		s.changes++
 	}
-	s.updateSession(event, event.SessionId, r)
-
-	go s.handleFunnels(&event)
-	s.changes++
-
 }
 
 func (s *PersistentMemoryTrackingHandler) HandleActionEvent(event ActionEvent, r *http.Request) {
 	s.dispatchFollowers(func(handler TrackingHandler) {
 		handler.HandleActionEvent(event, r)
 	})
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	go opsProcessed.Inc()
-	if event.BaseItem != nil && event.Id > 0 {
-		s.ItemEvents.Add(event.Id, DecayEvent{
-			TimeStamp: time.Now().Unix(),
-			Value:     30,
-		})
+	s.aofLogger.LogEvent(EVENT_ITEM_ACTION, event)
+	s.eventChan <- func() {
+		opsProcessed.Inc()
+		if event.BaseItem != nil && event.Id > 0 {
+			s.ItemEvents.Add(event.Id, DecayEvent{
+				TimeStamp: time.Now().Unix(),
+				Value:     s.Config.CalculateEventValue(EVENT_ITEM_ACTION, event.BaseItem),
+			})
+		}
+		s.updateSession(event, event.SessionId, r)
+		s.handleFunnels(&event)
+		s.changes++
 	}
-	s.updateSession(event, event.SessionId, r)
-	go s.handleFunnels(&event)
-	s.changes++
 }
 
 func (s *PersistentMemoryTrackingHandler) HandleSuggestEvent(event SuggestEvent, r *http.Request) {
 	s.dispatchFollowers(func(handler TrackingHandler) {
 		handler.HandleSuggestEvent(event, r)
 	})
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	go opsProcessed.Inc()
-	s.updateSession(event, event.SessionId, r)
-	go s.handleFunnels(&event)
-	s.Queries[event.Value] += 1
-	// TODO update this to somethign useful
-	// TODO add decay to this
-	//log.Printf("Suggest %s", event.Value)
-	s.changes++
+	s.aofLogger.LogEvent(EVENT_SUGGEST, event)
+	s.eventChan <- func() {
+		opsProcessed.Inc()
+		s.updateSession(event, event.SessionId, r)
+		s.handleFunnels(&event)
+		s.Queries[event.Value] += 1
+		s.changes++
+	}
+}
+
+func (s *PersistentMemoryTrackingHandler) UpdateConfig(cfg TrackingConfig) {
+	done := make(chan struct{})
+	s.eventChan <- func() {
+		s.Config = cfg
+		s.boltStorage.SaveMeta("tracking_config", cfg)
+		s.changes++
+		close(done)
+	}
+	<-done
 }

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/matst80/slask-finder/pkg/sorting"
+	"github.com/matst80/slask-finder/pkg/types"
 )
 
 type DiskOverrideStorage struct {
@@ -32,32 +32,32 @@ func (s *DiskOverrideStorage) saveToFile(filename string, data string) error {
 	return nil
 }
 
-func (s *DiskOverrideStorage) PopularityChanged(sort *sorting.SortOverride) error {
+func (s *DiskOverrideStorage) PopularityChanged(sort *types.SortOverride) error {
 	data := sort.ToString()
 	return s.saveToFile("popular", data)
 }
 
-func (s *DiskOverrideStorage) FieldPopularityChanged(sort *sorting.SortOverride) error {
+func (s *DiskOverrideStorage) FieldPopularityChanged(sort *types.SortOverride) error {
 	data := sort.ToString()
 	return s.saveToFile("popular-fields", data)
 }
 
-func (s *DiskOverrideStorage) SessionPopularityChanged(sessionId int64, sort *sorting.SortOverride) error {
+func (s *DiskOverrideStorage) SessionPopularityChanged(sessionId int64, _ string, sort *types.SortOverride) error {
 	data := sort.ToString()
 	return s.saveToFile(fmt.Sprintf("session-items-%d", sessionId), data)
 }
 
-func (s *DiskOverrideStorage) SessionFieldPopularityChanged(sessionId int64, sort *sorting.SortOverride) error {
+func (s *DiskOverrideStorage) SessionFieldPopularityChanged(sessionId int64, sort *types.SortOverride) error {
 	data := sort.ToString()
 	return s.saveToFile(fmt.Sprintf("session-fields-%d", sessionId), data)
 }
 
-func (s *DiskOverrideStorage) GroupPopularityChanged(groupId string, sort *sorting.SortOverride) error {
+func (s *DiskOverrideStorage) GroupPopularityChanged(groupId string, sort *types.SortOverride) error {
 	data := sort.ToString()
 	return s.saveToFile(fmt.Sprintf("group-items-%s", groupId), data)
 }
 
-func (s *DiskOverrideStorage) GroupFieldPopularityChanged(groupId string, sort *sorting.SortOverride) error {
+func (s *DiskOverrideStorage) GroupFieldPopularityChanged(groupId string, sort *types.SortOverride) error {
 	data := sort.ToString()
 	return s.saveToFile(fmt.Sprintf("group-fields-%s", groupId), data)
 }

@@ -151,6 +151,18 @@ func run_application() int {
 		}
 		return viewHandler.GetFunnels()
 	}))
+	mux.HandleFunc("GET /tracking/config", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+		return viewHandler.Config, nil
+	}))
+	mux.HandleFunc("PUT /tracking/config", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+		var cfg view.TrackingConfig
+		err := json.NewDecoder(r.Body).Decode(&cfg)
+		if err != nil {
+			return nil, err
+		}
+		viewHandler.UpdateConfig(cfg)
+		return viewHandler.Config, nil
+	}))
 	mux.HandleFunc("GET /tracking/item-events", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 		return viewHandler.GetItemEvents(), nil
 	}))
@@ -174,7 +186,7 @@ func run_application() int {
 		if err != nil {
 			return nil, err
 		}
-		return viewHandler.GetFieldValuePopularity(uint(id)), nil
+		return viewHandler.GetFieldValuePopularity(uint32(id)), nil
 	}))
 
 	mux.HandleFunc("GET /tracking/queries", JsonHandler(func(w http.ResponseWriter, r *http.Request) (interface{}, error) {

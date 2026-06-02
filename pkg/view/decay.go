@@ -3,7 +3,7 @@ package view
 import (
 	"math"
 
-	"github.com/matst80/slask-finder/pkg/sorting"
+	"github.com/matst80/slask-finder/pkg/types"
 )
 
 type DecayEvent struct {
@@ -80,9 +80,9 @@ func (d *DecayPopularity) RemoveOlderThan(when int64) {
 	d.Events = d.Events[:end]
 }
 
-type DecayList map[uint]DecayArray
+type DecayList map[uint32]DecayArray
 
-func (d *DecayList) Add(key uint, value DecayEvent) {
+func (d *DecayList) Add(key uint32, value DecayEvent) {
 	f, ok := (*d)[key]
 	if !ok {
 		(*d)[key] = []DecayEvent{
@@ -94,8 +94,8 @@ func (d *DecayList) Add(key uint, value DecayEvent) {
 	}
 }
 
-func (d *DecayList) Decay(now int64) sorting.SortOverride {
-	result := sorting.SortOverride{}
+func (d *DecayList) Decay(now int64) types.SortOverride {
+	result := types.SortOverride{}
 	var popularity float64
 	var event DecayEvent
 
@@ -107,7 +107,7 @@ func (d *DecayList) Decay(now int64) sorting.SortOverride {
 		if popularity < 0.002 {
 			continue
 		}
-		result[itemId] = popularity
+		result[uint32(itemId)] = popularity
 
 	}
 	// *d = slices.DeleteFunc(d, func(i DecayEvent) bool {

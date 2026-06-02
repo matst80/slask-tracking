@@ -43,13 +43,13 @@ func (p *PersonalizationGroup) HandleEvent(event interface{}) {
 
 	case SearchEvent:
 		for _, filter := range e.Filters.StringFilter {
-			p.FieldEvents.Add(filter.Id, DecayEvent{
+			p.FieldEvents.Add(uint32(filter.Id), DecayEvent{
 				TimeStamp: now,
 				Value:     150,
 			})
 		}
 		for _, filter := range e.Filters.RangeFilter {
-			p.FieldEvents.Add(filter.Id, DecayEvent{
+			p.FieldEvents.Add(uint32(filter.Id), DecayEvent{
 				TimeStamp: now,
 				Value:     100,
 			})

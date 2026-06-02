@@ -6,7 +6,6 @@ import (
 	"log"
 
 	"github.com/matst80/slask-finder/pkg/messaging"
-	"github.com/matst80/slask-finder/pkg/sorting"
 	"github.com/matst80/slask-finder/pkg/types"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -50,7 +49,7 @@ func NewSortOverrideStorage(conn *amqp.Connection) *SortOverrideStorage {
 	}
 }
 
-func (s *SortOverrideStorage) PopularityChanged(sort *sorting.SortOverride) error {
+func (s *SortOverrideStorage) PopularityChanged(sort *types.SortOverride) error {
 	s.diskStorage.PopularityChanged(sort)
 	messaging.SendChange(s.conn, "global", "sort_override", types.SortOverrideUpdate{
 		Key:  "popular",
@@ -59,7 +58,7 @@ func (s *SortOverrideStorage) PopularityChanged(sort *sorting.SortOverride) erro
 	return nil
 }
 
-func (s *SortOverrideStorage) FieldPopularityChanged(sort *sorting.SortOverride) error {
+func (s *SortOverrideStorage) FieldPopularityChanged(sort *types.SortOverride) error {
 	s.diskStorage.FieldPopularityChanged(sort)
 	return messaging.SendChange(s.conn, "global", "field_sort_override", types.SortOverrideUpdate{
 		Key:  "popular-fields",
@@ -67,15 +66,29 @@ func (s *SortOverrideStorage) FieldPopularityChanged(sort *sorting.SortOverride)
 	})
 }
 
-func (s *SortOverrideStorage) SessionPopularityChanged(sessionId int64, sort *sorting.SortOverride) error {
-	s.diskStorage.SessionPopularityChanged(sessionId, sort)
-	return messaging.SendChange(s.conn, "global", "sort_override", types.SortOverrideUpdate{
-		Key:  fmt.Sprintf("session-%d", sessionId),
-		Data: *sort,
+// sessionOverrideMsg is the wire format for a per-session override. It mirrors
+// types.SortOverrideUpdate plus the Group field the reader consumes
+// (slask-finder's SortOverrideUpdate.Group, json:"group"). Defined locally so
+// the tracker can emit the field without bumping its slask-finder dependency;
+// the field matches by JSON tag on the reader side.
+type sessionOverrideMsg struct {
+	Key   string               `json:"key"`
+	Data  types.SortOverride `json:"data"`
+	Group string               `json:"group,omitempty"`
+}
+
+func (s *SortOverrideStorage) SessionPopularityChanged(sessionId int64, group string, sort *types.SortOverride) error {
+	s.diskStorage.SessionPopularityChanged(sessionId, group, sort)
+	// Piggyback the session's current group so the reader can resolve the
+	// group layer ("group-<id>") without a separate session→group message.
+	return messaging.SendChange(s.conn, "global", "sort_override", sessionOverrideMsg{
+		Key:   fmt.Sprintf("session-%d", sessionId),
+		Data:  *sort,
+		Group: group,
 	})
 }
 
-func (s *SortOverrideStorage) SessionFieldPopularityChanged(sessionId int64, sort *sorting.SortOverride) error {
+func (s *SortOverrideStorage) SessionFieldPopularityChanged(sessionId int64, sort *types.SortOverride) error {
 	s.diskStorage.SessionFieldPopularityChanged(sessionId, sort)
 	return messaging.SendChange(s.conn, "global", "field_sort_override", types.SortOverrideUpdate{
 		Key:  fmt.Sprintf("session-fields-%d", sessionId),
@@ -83,7 +96,7 @@ func (s *SortOverrideStorage) SessionFieldPopularityChanged(sessionId int64, sor
 	})
 }
 
-func (s *SortOverrideStorage) GroupPopularityChanged(groupId string, sort *sorting.SortOverride) error {
+func (s *SortOverrideStorage) GroupPopularityChanged(groupId string, sort *types.SortOverride) error {
 	s.diskStorage.GroupPopularityChanged(groupId, sort)
 	return messaging.SendChange(s.conn, "global", "sort_override", types.SortOverrideUpdate{
 		Key:  fmt.Sprintf("group-%s", groupId),
@@ -91,7 +104,7 @@ func (s *SortOverrideStorage) GroupPopularityChanged(groupId string, sort *sorti
 	})
 }
 
-func (s *SortOverrideStorage) GroupFieldPopularityChanged(groupId string, sort *sorting.SortOverride) error {
+func (s *SortOverrideStorage) GroupFieldPopularityChanged(groupId string, sort *types.SortOverride) error {
 	s.diskStorage.GroupFieldPopularityChanged(groupId, sort)
 	return messaging.SendChange(s.conn, "global", "sort_override", types.SortOverrideUpdate{
 		Key:  fmt.Sprintf("group-fields-%s", groupId),

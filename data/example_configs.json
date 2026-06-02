@@ -1,0 +1,106 @@
+{
+  "default_configuration": {
+    "decay": {
+      "decay_rate": 0.9999995,
+      "max_age": 172800
+    },
+    "rules": [
+      {
+        "event_type": 2,
+        "base_value": 200,
+        "position_multiplier": 0.1,
+        "quantity_multiplier": 0
+      },
+      {
+        "event_type": 11,
+        "base_value": 0,
+        "position_multiplier": 0,
+        "quantity_multiplier": 190
+      },
+      {
+        "event_type": 14,
+        "base_value": 0,
+        "position_multiplier": 0,
+        "quantity_multiplier": 200
+      },
+      {
+        "event_type": 5,
+        "base_value": 0,
+        "position_multiplier": 1,
+        "quantity_multiplier": 0
+      },
+      {
+        "event_type": 6,
+        "base_value": 30,
+        "position_multiplier": 0,
+        "quantity_multiplier": 0
+      },
+      {
+        "event_type": 1,
+        "base_value": 20,
+        "position_multiplier": 0,
+        "quantity_multiplier": 0
+      }
+    ],
+    "persona_rules": [
+      {
+        "persona": "gamer",
+        "points": 5,
+        "conditions": {
+          "category": "Gaming"
+        }
+      },
+      {
+        "persona": "tv",
+        "points": 5,
+        "conditions": {
+          "category3": "TV"
+        }
+      },
+      {
+        "persona": "apple",
+        "points": 3,
+        "conditions": {
+          "brand": "Apple"
+        }
+      }
+    ]
+  },
+  "custom_b2b_overrides": {
+    "decay": {
+      "decay_rate": 0.9999999,
+      "max_age": 604800
+    },
+    "rules": [
+      {
+        "event_type": 2,
+        "base_value": 100,
+        "position_multiplier": 0,
+        "quantity_multiplier": 0
+      },
+      {
+        "event_type": 11,
+        "base_value": 0,
+        "position_multiplier": 0,
+        "quantity_multiplier": 500
+      }
+    ],
+    "persona_rules": [
+      {
+        "persona": "corporate_buyer",
+        "points": 10,
+        "conditions": {
+          "category": "Office Equipment"
+        }
+      },
+      {
+        "persona": "developer",
+        "points": 15,
+        "conditions": {
+          "category2": "Laptops",
+          "brand": "Apple"
+        }
+      }
+    ]
+  }
+}

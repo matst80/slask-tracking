@@ -29,13 +29,27 @@ func (session *SessionData) DecayEvents(trk PopularityListener) {
 	if si > 0 {
 		itemPopularity := session.ItemEvents.Decay(now)
 		if len(itemPopularity) > 0 {
-			if err := trk.SessionPopularityChanged(session.Id, &itemPopularity); err != nil {
+			if err := trk.SessionPopularityChanged(session.Id, session.dominantGroup(), &itemPopularity); err != nil {
 				log.Println(err)
 			} else {
 				log.Printf("Sending session item events %d", len(itemPopularity))
 			}
 		}
 	}
+}
+
+// dominantGroup returns the highest-weighted group this session belongs to, or
+// "" if it isn't classified. Sent alongside the per-session override so the
+// reader can resolve the group layer (see SortOverrideUpdate.Group).
+func (session *SessionData) dominantGroup() string {
+	best := ""
+	var bestVal float64
+	for g, v := range session.Groups {
+		if g != "" && v > bestVal {
+			best, bestVal = g, v
+		}
+	}
+	return best
 }
 
 func (p *PersonalizationGroup) DecayGroupEvents(trk PopularityListener) {
@@ -68,21 +82,6 @@ func (p *PersonalizationGroup) DecayGroupEvents(trk PopularityListener) {
 	}
 }
 
-func (s *PersistentMemoryTrackingHandler) DecayEvents() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	now := time.Now().Unix()
-	l := len(s.ItemEvents) + len(s.FieldEvents)
-	if l == 0 {
-		return
-	}
-
-	s.ItemPopularity = s.ItemEvents.Decay(now)
-	s.FieldPopularity = s.FieldEvents.Decay(now)
-
-	log.Printf("Decayed events %d", l)
-}
-
 func byValueScore(a, b FacetValueResult) int {
 	return cmp.Compare(b.Score, a.Score)
 }
@@ -95,77 +94,6 @@ func byQueryScore(a, b QueryResult) int {
 	return cmp.Compare(b.Score, a.Score)
 }
 
-func (s *PersistentMemoryTrackingHandler) DecaySuggestions() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	now := time.Now().Unix()
-
-	result := make([]QueryResult, 0)
-
-	for query, _ := range s.QueryEvents {
-		for j := len(query) - 1; j >= 4; j-- {
-			key := query[:j]
-			if key == query {
-				continue
-			}
-			_, found := s.QueryEvents[key]
-			if found {
-				delete(s.QueryEvents, query)
-			} else {
-				break
-			}
-		}
-	}
-
-	for q, suggestion := range s.QueryEvents {
-		suggestion.Popularity.Decay(now)
-		queryResult := QueryResult{
-			Query: q,
-			Score: suggestion.Popularity.Value,
-		}
-		facetResults := make([]FacetResult, 0)
-		for facetId, keyField := range suggestion.KeyFields {
-			valueResults := make([]FacetValueResult, 0)
-			keyField.FieldPopularity.Decay(now)
-			facetResult := FacetResult{
-				FacetId: facetId,
-				Score:   keyField.FieldPopularity.Value,
-			}
-			for value, v := range keyField.ValuePopularity {
-				v.Decay(now)
-				valueResults = append(valueResults, FacetValueResult{
-					Value: value,
-					Score: v.Value,
-				})
-			}
-			slices.SortFunc(valueResults, byValueScore)
-
-			facetResult.Values = valueResults
-			facetResults = append(facetResults, facetResult)
-			maps.DeleteFunc(keyField.ValuePopularity, func(key string, value *DecayPopularity) bool {
-				// log.Printf("Deleting value popularity %s for query %s, value:%f", key, q, value.Value)
-				return value.Value < 0.0002
-			})
-
-		}
-		maps.DeleteFunc(suggestion.KeyFields, func(key uint, value QueryKeyData) bool {
-			// log.Printf("Deleting facet popularity %d for query %s, value:%f", key, q, value.FieldPopularity.Value)
-			return value.FieldPopularity.Value < 0.0002
-		})
-		slices.SortFunc(facetResults, byFacetScore)
-		queryResult.Facets = facetResults
-		result = append(result, queryResult)
-	}
-
-	slices.SortFunc(result, byQueryScore)
-
-	maps.DeleteFunc(s.QueryEvents, func(key string, value QueryMatcher) bool {
-		// log.Printf("Deleting query %s, value %f", key, value.Popularity.Value)
-		return value.Popularity.Value < 0.0002
-	})
-	s.SortedQueries = result
-	log.Printf("Decayed suggestions %d", len(s.QueryEvents))
-}
 
 func (s *PersistentMemoryTrackingHandler) cleanSessions() {
 	s.mu.Lock()
@@ -209,57 +137,4 @@ func (s *PersistentMemoryTrackingHandler) cleanSessions() {
 	// 		delete(s.Sessions, key)
 	// 	}
 	// }
-}
-
-func (s *PersistentMemoryTrackingHandler) DecayFacetValuesEvents() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	now := time.Now().Unix()
-
-	result := map[uint][]FacetValueResult{}
-
-	for facetId, facet := range s.FieldValueEvents {
-		valueResult := make([]FacetValueResult, 0)
-		score := 0.0
-		for value, field := range facet {
-			field.Decay(now)
-			if field.Value > 0.0002 {
-				valueResult = append(valueResult, FacetValueResult{
-					Value: value,
-					Score: field.Value,
-				})
-				score += field.Value
-			}
-		}
-		slices.SortFunc(valueResult, byValueScore)
-		result[facetId] = valueResult
-
-		maps.DeleteFunc(facet, func(key string, value *DecayPopularity) bool {
-			return value.Value < 0.0002
-		})
-	}
-	s.FieldValueScores = result
-	log.Printf("Decayed field events %d", len(s.FieldEvents))
-}
-
-func (s *PersistentMemoryTrackingHandler) DecaySessionEvents() {
-	if s.trackingHandler != nil {
-		for id, session := range s.Sessions {
-			if session.Id != id {
-				session.Id = id
-			}
-			session.DecayEvents(s.trackingHandler)
-		}
-	}
-}
-
-func (s *PersistentMemoryTrackingHandler) DecayGroupEvents() {
-	if s.trackingHandler != nil {
-		for id, group := range s.PersonalizationGroups {
-			if group.Id != id {
-				group.Id = id
-			}
-			group.DecayGroupEvents(s.trackingHandler)
-		}
-	}
 }
